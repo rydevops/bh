@@ -209,6 +209,8 @@ svg.i { width: 1.25em; height: 1.25em; flex: none; vertical-align: -0.22em; }
 .mission .bar { grid-column: 1 / -1; }
 .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 10px; }
 .day { border-radius: 10px; padding: 6px 2px; text-align: center; font-size: .66rem; font-weight: 800; background: rgba(0,0,0,.3); border: 1.5px solid var(--line); min-height: 64px; display: flex; flex-direction: column; justify-content: space-between; align-items: center; }
+.day-rew { font-size: .7rem; line-height: 1.5; font-weight: 800; }
+.day-rew svg.i { width: 1em; height: 1em; }
 .day.done { background: rgba(63,201,138,.2); border-color: var(--good); }
 .day.today { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,176,46,.4); }
 
