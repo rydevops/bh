@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><title>sprite sheet</title>
+<body style="margin:0;background:#1a2036"><canvas id="c" width="1200" height="760"></canvas>
+<script type="module">
+import { heroSprite, enemySprite, bossSprite, droneSprite, turretSprite } from '../../js/render/sprites.js';
+import { HERO_ORDER } from '../../js/data/heroes.js';
+const c = document.getElementById('c'), ctx = c.getContext('2d'); const S = 2;
+let x = 10;
+HERO_ORDER.forEach((id, i) => { const s = heroSprite(id, 'default', S); ctx.drawImage(s, x, 10, s.lw * S, s.lh * S); x += 140; });
+const d = droneSprite('default', S); ctx.drawImage(d, x, 20, d.lw * S, d.lh * S); x += 80;
+const t = turretSprite(S); ctx.drawImage(t, x, 20, t.lw * S, t.lh * S);
+const types = ['grunt','runner','bulwark','sentinel','spitter','drone','splitter','slimeling'];
+const rs = { grunt: 11, runner: 9, bulwark: 17, sentinel: 13, spitter: 11, drone: 10, splitter: 15, slimeling: 7 };
+for (let w = 0; w < 3; w++) types.forEach((ty, i) => { const s = enemySprite(ty, w, 0, rs[ty], S); ctx.drawImage(s, 10 + i * 140, 190 + w * 120, s.lw * S, s.lh * S); });
+['colossus','leviathan','broodmother'].forEach((id, i) => { const s = bossSprite(id, false, 46, S); ctx.drawImage(s, 10 + i * 330, 540, s.lw * S * 0.9, s.lh * S * 0.9); const e = bossSprite(id, true, 46, 1); ctx.drawImage(e, 10 + i * 330 + 230, 600); });
+window.done = true;
+</script>

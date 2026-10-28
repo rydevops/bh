@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<body style="margin:0;background:#000"><canvas id="c" style="display:block"></canvas>
+<script type="module">
+import { Game } from '../../js/sim/game.js';
+import { Renderer, layoutFor } from '../../js/render/renderer.js';
+import { STAGE_BY_ID } from '../../js/data/stages.js';
+const q = new URLSearchParams(location.search);
+const stage = STAGE_BY_ID[q.get('stage') || '1-4'];
+const ids = (q.get('squad') || 'vanguard,rook,pulse,ember').split(',');
+const startWave = +(q.get('wave') ?? 3);
+const until = +(q.get('t') || 14);
+const cv = document.getElementById('c');
+const W = innerWidth, H = innerHeight, dpr = 1;
+cv.style.width = W + 'px'; cv.style.height = H + 'px';
+const L = layoutFor(W, H, 0);
+const r = new Renderer(cv); r.resize(W, H, dpr);
+const lv = +(q.get('lv') || 12);
+const g = new Game({ stage, squad: ids.map((id) => ({ id, lv, rank: 3, skin: 'default' })), seed: 5, layout: L, autoAbility: true });
+g.owned = { aux_turret: 2, heavy_rounds: 2, ignition: 1, cryo_rounds: 1 }; g.recomputeMods(false);
+g.startWave(startWave);
+r.attach(g, { reduceShake: false, reduceFlash: false, highContrast: false, damageNumbers: true }, 'default');
+let last = performance.now(), blade = null;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (g.state === 'upgrade') g.pickUpgrade(g.choices[0]);
+  g.update(dt);
+  r.draw(g, dt, false, blade);
+  if (g.t > until) window.done = true; else requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.game = g;
+</script>

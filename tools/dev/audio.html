@@ -1,0 +1,38 @@
+<!doctype html><meta charset="utf-8"><body>
+<script type="module">
+import { Music, TRACKS } from '../../js/audio/music.js';
+import { AudioEngine, SFX } from '../../js/audio/engine.js';
+const res = {};
+async function renderTrack(name, bars) {
+  const sr = 44100;
+  const dur = bars * 16 * (60 / TRACKS[name].bpm / 4) + 1.5;
+  const oc = new OfflineAudioContext(2, Math.ceil(sr * dur), sr);
+  const bus = oc.createGain(); bus.gain.value = 0.55 * TRACKS[name].level;
+  const comp = oc.createDynamicsCompressor(); bus.connect(comp); comp.connect(oc.destination);
+  const nb = oc.createBuffer(1, sr * 1.5, sr); const d = nb.getChannelData(0); let s = 1;
+  for (let i = 0; i < d.length; i++) { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; d[i] = s / 2147483648 - 1; }
+  const m = new Music(oc, bus, nb);
+  m.scheduleAll(name, bus, bars);
+  const buf = await oc.startRendering();
+  const ch = buf.getChannelData(0);
+  let peak = 0, sum = 0, nz = 0;
+  for (let i = 0; i < ch.length; i++) { const v = Math.abs(ch[i]); if (v > peak) peak = v; sum += v * v; if (v > 0.001) nz++; }
+  return { peak: +peak.toFixed(3), rms: +Math.sqrt(sum / ch.length).toFixed(4), activeFrac: +(nz / ch.length).toFixed(2), secs: +dur.toFixed(1) };
+}
+async function renderSfx(name) {
+  const sr = 44100;
+  const oc = new OfflineAudioContext(1, sr * 2, sr);
+  const eng = Object.create(AudioEngine.prototype);
+  eng.sfxBus = oc.createGain(); eng.sfxBus.connect(oc.destination);
+  const nb = oc.createBuffer(1, sr, sr); const d = nb.getChannelData(0); let s = 7;
+  for (let i = 0; i < d.length; i++) { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; d[i] = s / 2147483648 - 1; }
+  eng.noiseBuf = nb;
+  SFX[name].play(eng, oc, 0.01, { id: 'vanguard' });
+  const buf = await oc.startRendering(); const ch = buf.getChannelData(0);
+  let peak = 0, last = 0; for (let i = 0; i < ch.length; i++) { const v = Math.abs(ch[i]); if (v > peak) peak = v; if (v > 0.002) last = i; }
+  return { peak: +peak.toFixed(3), lenMs: Math.round(last / sr * 1000) };
+}
+res.music = {}; for (const n of Object.keys(TRACKS)) res.music[n] = await renderTrack(n, 8);
+res.sfx = {}; for (const n of Object.keys(SFX)) res.sfx[n] = await renderSfx(n);
+window.result = res; window.done = true;
+</script>

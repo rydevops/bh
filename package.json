@@ -1,0 +1,16 @@
+{
+  "name": "bullet-heroes",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bullet Heroes - an offline-capable PWA squad shooter / tower defense. No ads, no real-money purchases.",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "stamp": "node tools/stamp.mjs",
+    "stamp:check": "node tools/stamp.mjs --check",
+    "build": "node tools/build.mjs",
+    "serve": "node tools/serve.mjs",
+    "icons": "node tools/gen-icons.mjs",
+    "balance": "node tools/balance.mjs"
+  }
+}
