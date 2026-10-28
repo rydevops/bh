@@ -1,0 +1,31 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0">
+<canvas id="c"></canvas>
+<script type="module">
+import { heroSprite } from '../../js/render/sprites.js';
+const q = new URLSearchParams(location.search);
+const S = +(q.get('size') || 512), maskable = q.get('maskable') === '1';
+const c = document.getElementById('c'); c.width = c.height = S; const ctx = c.getContext('2d');
+// background
+const g = ctx.createRadialGradient(S / 2, S * 0.38, S * 0.05, S / 2, S / 2, S * 0.75);
+g.addColorStop(0, '#3a2a8a'); g.addColorStop(0.55, '#16204e'); g.addColorStop(1, '#070a1a');
+if (!maskable) { ctx.beginPath(); ctx.roundRect(0, 0, S, S, S * 0.22); ctx.clip(); }
+ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+// tracer streaks fanning upward
+ctx.lineCap = 'round'; ctx.globalCompositeOperation = 'lighter';
+const cx = S / 2, by = S * 0.55;
+[[-0.52, 0.8], [-0.26, 0.92], [0, 1], [0.26, 0.92], [0.52, 0.8]].forEach(([a, l], i) => {
+  const ang = -Math.PI / 2 + a, len = S * 0.5 * l;
+  const col = ['#4cf0ff', '#ffd23f', '#ff8a2e', '#ffd23f', '#4cf0ff'][i];
+  ctx.strokeStyle = col; ctx.globalAlpha = 0.35; ctx.lineWidth = S * 0.045;
+  ctx.beginPath(); ctx.moveTo(cx + Math.cos(ang) * S * 0.12, by + Math.sin(ang) * S * 0.12); ctx.lineTo(cx + Math.cos(ang) * len, by + Math.sin(ang) * len); ctx.stroke();
+  ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; ctx.lineWidth = S * 0.014; ctx.stroke();
+});
+ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+// hero trio: Rook + Vanguard + Pulse, Vanguard in front
+const scale = (maskable ? 0.0062 : 0.0072) * S;
+const draw = (id, x, y, k) => { const s = heroSprite(id, 'default', 4); ctx.drawImage(s, x - (s.lw * k) / 2, y - (s.lh * k) / 2, s.lw * k, s.lh * k); };
+draw('rook', S * 0.25, S * 0.62, scale * 0.92); draw('pulse', S * 0.75, S * 0.62, scale * 0.92); draw('vanguard', S * 0.5, S * 0.65, scale * 1.1);
+// ground bar
+ctx.fillStyle = 'rgba(255,176,46,.9)'; ctx.fillRect(0, S * 0.9, S, S * 0.012);
+window.done = true;
+</script>
