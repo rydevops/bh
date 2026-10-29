@@ -242,6 +242,8 @@ function buildHud(s) {
   const g = s.game;
   const hd = {};
   hd.wave = h('div', { class: 'hud-wave' });
+  hd.waveFill = h('i');
+  hd.waveBar = h('div', { class: 'wavebar', role: 'progressbar', 'aria-label': 'Enemies left in this wave' }, hd.waveFill);
   hd.baseFill = h('i'); hd.barrier = h('b'); hd.baseTxt = h('span');
   hd.base = h('div', { class: 'basebar', role: 'progressbar', 'aria-label': 'Wall health' }, hd.baseFill, hd.barrier, hd.baseTxt);
   hd.bossName = h('span'); hd.bossPct = h('span');
@@ -274,7 +276,7 @@ function buildHud(s) {
     return { b, shade, cd, last: '' };
   });
   hud.append(
-    h('div', { class: 'hud-top' }, hd.pauseBtn, h('div', { class: 'hud-mid' }, hd.wave, hd.base, hd.boss), hd.speedBtn),
+    h('div', { class: 'hud-top' }, hd.pauseBtn, h('div', { class: 'hud-mid' }, hd.wave, hd.waveBar, hd.base, hd.boss), hd.speedBtn),
     hd.banner, hd.tip,
     h('div', { class: 'tray' },
       h('div', { class: 'cutmeter' }, h('span', { html: icon('blade') }), 'CUT', h('div', { class: 'bar cyan' }, hd.cutFill)),
@@ -289,7 +291,12 @@ function setIf(s, key, val, fn) { if (s.hudCache[key] !== val) { s.hudCache[key]
 function updateHud(s) {
   const g = s.game, hd = s.hud;
   const frac = Math.max(0, g.base.hp / g.base.max);
-  setIf(s, 'wave', `${g.waveIdx}|${g.waveCount}`, () => { hd.wave.textContent = g.survival ? `SURVIVAL · WAVE ${g.waveIdx + 1}` : `WAVE ${Math.max(1, g.waveIdx + 1)} / ${g.waveCount}`; });
+  const wp = g.waveProgress();
+  setIf(s, 'waveLeft', `${g.waveIdx}|${wp.left}|${wp.max}`, () => {
+    hd.waveFill.style.width = (wp.left / wp.max) * 100 + '%';
+    hd.waveBar.setAttribute('aria-valuenow', String(wp.left));
+    hd.wave.textContent = (g.survival ? `SURVIVAL · WAVE ${g.waveIdx + 1}` : `WAVE ${Math.max(1, g.waveIdx + 1)} / ${g.waveCount}`) + (wp.left > 0 && g.state === 'combat' ? ` · ${wp.left} LEFT` : '');
+  });
   setIf(s, 'base', Math.round(frac * 200), () => {
     hd.baseFill.style.width = frac * 100 + '%';
     hd.baseFill.className = frac < 0.3 ? 'low' : frac < 0.6 ? 'mid' : '';
