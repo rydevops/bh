@@ -51,7 +51,7 @@ export const UPGRADES = {
     perLevel: (m) => { m.crit += 0.07; m.critMult += 0.1; },
   },
   phase_rounds: {
-    id: 'phase_rounds', name: 'Phase Rounds', cat: 'skill', rarity: 'rare', max: 3, icon: 'pierce',
+    id: 'phase_rounds', bullet: true, name: 'Phase Rounds', cat: 'skill', rarity: 'rare', max: 3, icon: 'pierce',
     tags: ['pierce', 'sniper', 'ballistic', 'rapid'], counters: ['swarm'],
     text: (l) => `Shots pierce ${l} extra target${l > 1 ? 's' : ''} (+1)`,
     perLevel: (m) => { m.pierce += 1; },
@@ -89,7 +89,7 @@ export const UPGRADES = {
     perLevel: (m) => { m.turretRate += 0.3; },
   },
   target_lock: {
-    id: 'target_lock', name: 'Target Lock', cat: 'firepower', rarity: 'common', max: 3, icon: 'scope',
+    id: 'target_lock', bullet: true, name: 'Target Lock', cat: 'firepower', rarity: 'common', max: 3, icon: 'scope',
     tags: ['sniper', 'ballistic', 'rapid'], counters: ['ranged'],
     text: (l) => `Weapon range +${p(0.12 * l)}, bullets curve toward targets`,
     perLevel: (m) => { m.range += 0.12; m.homing += 1; },
@@ -103,13 +103,13 @@ export const UPGRADES = {
 
   // ---------- Ammunition ----------
   heavy_rounds: {
-    id: 'heavy_rounds', name: 'Heavy Rounds', cat: 'ammo', rarity: 'common', max: 6, icon: 'bullet',
+    id: 'heavy_rounds', bullet: true, name: 'Heavy Rounds', cat: 'ammo', rarity: 'common', max: 6, icon: 'bullet',
     tags: ['ballistic', 'explosive', 'sniper', 'rapid'], counters: ['armored'],
     text: (l) => `Projectile damage +${p(0.18 * l)}${l > 1 ? ' (+18% each)' : ''}`,
     perLevel: (m) => { m.dmg += 0.18; },
   },
   hypervelocity: {
-    id: 'hypervelocity', name: 'Hypervelocity', cat: 'ammo', rarity: 'common', max: 3, icon: 'speed',
+    id: 'hypervelocity', bullet: true, name: 'Hypervelocity', cat: 'ammo', rarity: 'common', max: 3, icon: 'speed',
     tags: ['ballistic', 'sniper'], counters: ['fast'],
     text: (l) => `Bullet speed +${p(0.2 * l)}, damage +${p(0.06 * l)}`,
     perLevel: (m) => { m.speed += 0.2; m.dmg += 0.06; },
@@ -133,19 +133,19 @@ export const UPGRADES = {
     perLevel: (m) => { m.pile += 8; },
   },
   armor_piercing: {
-    id: 'armor_piercing', name: 'Armor-Piercing Rounds', cat: 'ammo', rarity: 'rare', max: 3, icon: 'drill',
+    id: 'armor_piercing', bullet: true, name: 'Armor-Piercing Rounds', cat: 'ammo', rarity: 'rare', max: 3, icon: 'drill',
     tags: ['ballistic', 'armor', 'sniper'], counters: ['armored'],
     text: (l) => `Ignore ${p(0.15 * l)} of enemy armor${l > 1 ? ' (+15% each)' : ''}`,
     perLevel: (m) => { m.armorPierce += 0.15; },
   },
   cryo_rounds: {
-    id: 'cryo_rounds', name: 'Cryo Rounds', cat: 'ammo', rarity: 'rare', max: 3, icon: 'snow',
+    id: 'cryo_rounds', bullet: true, name: 'Cryo Rounds', cat: 'ammo', rarity: 'rare', max: 3, icon: 'snow',
     tags: ['frost', 'support', 'rapid'], counters: ['fast', 'swarm'],
     text: (l) => `Hits slow enemies by ${p(0.18 * l)} for 1.5s`,
     perLevel: (m) => { m.frost += 1; },
   },
   explosive_rounds: {
-    id: 'explosive_rounds', name: 'Explosive Rounds', cat: 'ammo', rarity: 'epic', max: 3, icon: 'blast',
+    id: 'explosive_rounds', bullet: true, name: 'Explosive Rounds', cat: 'ammo', rarity: 'epic', max: 3, icon: 'blast',
     tags: ['explosive', 'area', 'ballistic'], counters: ['swarm'],
     text: (l) => `Bullets explode for ${p(0.35)} damage in a ${24 + l * 8}px radius`,
     perLevel: (m) => { m.splashR += 8; m.splashFrac = 0.35; if (m.splashR < 32) m.splashR = 32; },
@@ -209,7 +209,7 @@ for (const heroId of HERO_ORDER) {
   const hero = HEROES[heroId];
   const id = multishotId(heroId);
   UPGRADES[id] = {
-    id, hero: heroId, name: `${hero.name}: Multi-Shot`, cat: 'ammo', rarity: 'rare', max: 4, icon: 'magazine',
+    id, hero: heroId, bullet: true, name: `${hero.name}: Multi-Shot`, cat: 'ammo', rarity: 'rare', max: 4, icon: 'magazine',
     tags: hero.tags, counters: ['swarm'],
     text: (l) => `${hero.name} fires ${1 + l} bullets per shot, in a row with no reload between them (max 5). Every bullet uses ammo`,
     perLevel: (m) => { m.projBy[heroId] = (m.projBy[heroId] || 0) + 1; },
@@ -262,9 +262,12 @@ export function rollUpgrades(rng, { owned, squadTags, enemyTags, wave, baseFrac,
   }
   const out = [];
   const catCount = {};
+  // Every reward round puts at least one bullet upgrade (damage, speed, armor-piercing, frost, explosive, Multi-Shot...)
+  // on the table, so the bullets always have something to grow into.
+  const hasBullet = pool.some((e) => UPGRADES[e.id].bullet);
   for (let k = 0; k < n && pool.length; k++) {
     // Soft variety: cards sharing a category with one already offered are less likely.
-    const weights = pool.map((e) => e.w * (catCount[UPGRADES[e.id].cat] ? 0.5 : 1));
+    const weights = pool.map((e) => e.w * (catCount[UPGRADES[e.id].cat] ? 0.5 : 1) * (k === 0 && hasBullet && !UPGRADES[e.id].bullet ? 0 : 1));
     const total = weights.reduce((a, b) => a + b, 0);
     let r = rng.next() * total;
     let idx = 0;
