@@ -173,3 +173,22 @@ test('hero power scales with level and rank', () => {
   const p = defaultProfile();
   assert.equal(squadPower(p), heroPower('vanguard', 1, 1) + heroPower('rook', 1, 1) + heroPower('patch', 1, 1));
 });
+
+test('every stage drops fragments for every starting hero, and a loss still gives each of them one', async () => {
+  const { STAGES, STARTERS } = await import('../js/data/stages.js');
+  assert.deepEqual([...STARTERS].sort(), ['patch', 'rook', 'vanguard']);
+  for (const s of STAGES) for (const id of STARTERS) assert.ok(s.frag.some((f) => f.hero === id && f.n >= 2), `${s.id} drops ${id}`);
+  const p = defaultProfile();
+  const win1 = win(p, '1-1');
+  for (const id of STARTERS) assert.ok(win1.frags[id] >= 2, `first clear of 1-1 gives ${id} fragments`);
+  const lose = eco.applyRunResult(p, { runId: 'l9', mode: 'campaign', stageId: '1-2', win: false, baseFrac: 0, coinsEarned: 10, wave: 2, kills: 5 });
+  for (const id of STARTERS) assert.ok(lose.frags[id] >= 1, `a loss still gives ${id} a fragment`);
+  assert.ok(p.frags.vanguard > 0 && p.frags.rook > 0 && p.frags.patch > 0);
+});
+
+test('starting heroes can rank up from stage fragments', () => {
+  const p = defaultProfile();
+  for (const id of ['1-1', '1-2', '1-3', '1-4']) win(p, id);
+  assert.ok(p.frags.rook >= 10, 'enough Rook fragments for rank 2 after World 1');
+  assert.ok(eco.rankUpHero(p, 'rook').ok);
+});

@@ -3,8 +3,8 @@
 // All currencies are earned in-game. There is no real-money purchase path.
 
 import { HEROES, TRAILS, MAX_RANK, RANK_COST, levelCap, levelCost, HERO_ORDER } from './data/heroes.js';
-import { RESEARCH } from './data/research.js';
-import { STAGES, STAGE_BY_ID, MILESTONES } from './data/stages.js';
+import { RESEARCH, researchBonuses } from './data/research.js';
+import { STAGES, STAGE_BY_ID, MILESTONES, STARTERS } from './data/stages.js';
 import { DAILY_POOL, WEEKLY_POOL, LOGIN_CALENDAR } from './data/missions.js';
 import { slotCount } from './progression.js';
 
@@ -156,6 +156,8 @@ export function applyRunResult(p, result) {
     out.coins = Math.round((result.coinsEarned || 0) + waves * 25);
     out.tokens = Math.floor(waves / 10);
     out.gems = Math.floor(waves / 5);
+    // Survival has no stage drops, so it pays out starter fragments instead (1 per hero per 8 waves).
+    for (const id of STARTERS) if (waves >= 8) out.frags[id] = Math.floor(waves / 8);
     if (waves > p.survivalBest) { out.newBest = true; p.survivalBest = waves; }
   } else {
     const stage = STAGE_BY_ID[result.stageId];
@@ -183,9 +185,11 @@ export function applyRunResult(p, result) {
       out.coins = Math.round((result.coinsEarned || 0) * 0.6);
       const f = stage.frag[0];
       if (f && (result.wave || 0) >= 1) out.frags[f.hero] = 1;
+      if ((result.wave || 0) >= 1) for (const id of STARTERS) out.frags[id] = (out.frags[id] || 0) + 1;
     }
   }
 
+  out.gems = Math.round(out.gems * (1 + researchBonuses(p.research).gems));
   p.coins += out.coins;
   p.gems += out.gems;
   p.tokens += out.tokens;

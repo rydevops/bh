@@ -2,6 +2,7 @@
 // spawn schedules (explicit `waves`, or generated from `pool`), modifiers, bosses, rewards.
 
 import { ENEMIES, TUNE, statScale } from './enemies.js';
+import { HEROES, HERO_ORDER } from './heroes.js';
 import { heroDps, expectedLevel, expectedRank } from '../progression.js';
 
 export const WORLDS = [
@@ -79,12 +80,27 @@ const STAGE_DEFS = [
     coins: 380, gems: 30, tokens: 4, frag: [{ hero: 'specter', n: 8 }, { hero: 'ember', n: 8 }] },
 ];
 
+/** The heroes every player starts with. They need fragments to rank up, so every stage drops some of each. */
+export const STARTERS = HERO_ORDER.filter((id) => HEROES[id].unlock.start);
+
+/** Add the starter heroes' fragments to a stage's drop list (3 per hero early, 4 mid, 5 late; +1 on boss stages). */
+function withStarterFrags(def, idx) {
+  const base = 3 + Math.floor(idx / 4) + (def.boss ? 1 : 0);
+  const frag = def.frag.map((f) => ({ ...f }));
+  for (const hero of STARTERS) {
+    const have = frag.find((f) => f.hero === hero);
+    if (have) have.n = Math.max(have.n, base);
+    else frag.push({ hero, n: base });
+  }
+  return frag;
+}
+
 export const STAGES = STAGE_DEFS.map((s, idx) => {
   const enemyIds = new Set(s.pool.map((p) => p.e));
   const tags = new Set();
   for (const id of enemyIds) for (const t of ENEMIES[id].tags) tags.add(t);
   if (s.boss) tags.add('boss');
-  return { ...s, idx, tags: [...tags], enemies: [...enemyIds] };
+  return { ...s, frag: withStarterFrags(s, idx), idx, tags: [...tags], enemies: [...enemyIds] };
 });
 
 export const STAGE_BY_ID = Object.fromEntries(STAGES.map((s) => [s.id, s]));

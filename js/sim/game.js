@@ -17,6 +17,7 @@ const STEP_MAX = 1 / 30;
 /** Order in which chambers become loaded (spread around the ring so a 2nd chamber sits opposite the 1st, etc). */
 export const CHAMBER_ORDER = [0, 3, 1, 4, 2, 5];
 const TICK = 0.1; // beam / flame damage tick
+const SEQ_GAP = 0.14; // seconds between the bullets of a Multi-Shot sequence
 /** Chance that a post-wave reward round offers a new hero (guaranteed after one miss). */
 export const SUMMON_CHANCE = 0.5;
 
@@ -45,6 +46,7 @@ export class Game {
     this.t = 0;
     this.state = 'combat'; // combat | upgrade | victory | defeat
     this.waveIdx = -1;
+    this.waveMax = 1;
     this.waveT = 0;
     this.spawnQ = [];
     this.bannerT = 0;
@@ -121,7 +123,7 @@ export class Game {
       atk: attackPower(s.id, s.lv, s.rank),
       // damage per 0.1s tick if the weapon fired continuously (used by Sustained Beam, Firestorm and burn)
       cont: (attackPower(s.id, s.lv, s.rank) * (def.base.volley || 1) * 0.1) / def.base.interval,
-      cd: 0.3 + i * 0.11, cdMax: 0.3 + i * 0.11, retryT: 0, burstT: 0, tickCd: 0, dry: false, tgt: null, recoil: 0, disabled: 0, flash: 0,
+      cd: 0.3 + i * 0.11, cdMax: 0.3 + i * 0.11, retryT: 0, seq: 0, seqT: 0, burstT: 0, tickCd: 0, dry: false, tgt: null, recoil: 0, disabled: 0, flash: 0,
       ab: { cd: def.ability.cd * 0.35, max: def.ability.cd, active: 0, activeMax: 0 },
       buff: { rate: 1, rateT: 0 },
       deadEyeT: 0, beamBoost: 0, beam: null, flameOn: false, interceptCd: 3,
@@ -154,6 +156,10 @@ export class Game {
 
   recomputeMods(initial) {
     this.mods = modsFromUpgrades(this.owned);
+    // Permanent research stacks on top of the run's upgrades.
+    const rb = this.bonus, m = this.mods;
+    m.crit += rb.crit; m.reload += rb.reload; m.reduce += rb.reduce; m.regen += rb.regen;
+    m.pile += rb.pile; m.cycle += rb.cycle; m.abilityPower += rb.abilityPower;
     const newMax = this.baseMax0 * (1 + this.mods.hpMult + this.bonus.hp);
     const delta = newMax - this.base.max;
     this.base.max = newMax;
@@ -199,6 +205,7 @@ export class Game {
       for (let k = 0; k < g.n; k++) this.spawnQ.push({ t: g.at + k * g.every, e: g.e });
     }
     this.spawnQ.sort((a, b) => a.t - b.t);
+    this.waveMax = this.spawnQ.length;
     this.bannerT = 2.2;
     const isBossWave = groups.some((g) => g.boss);
     this.ev('wave', { wave: i, total: this.waveCount, boss: isBossWave });
@@ -272,6 +279,13 @@ export class Game {
       if (s.boss) { spawnBoss(this, s.boss); continue; }
       this.spawnEnemy(s.e);
     }
+  }
+
+  /** Enemies still to come or still alive this wave, and the most there have been at once (for the HUD bar). */
+  waveProgress() {
+    const left = this.spawnQ.length + this.enemies.length;
+    if (left > this.waveMax) this.waveMax = left; // splitters and summoners add more mid-wave
+    return { left, max: Math.max(1, this.waveMax) };
   }
 
   checkWaveClear() {
@@ -628,27 +642,31 @@ export class Game {
   }
   updateHeroes(dt) {
     for (const h of this.heroes) {
-      if (h.disabled > 0) { h.beam = null; h.flameOn = false; h.burstT = 0; continue; }
+      if (h.disabled > 0) { h.beam = null; h.flameOn = false; h.burstT = 0; h.seq = 0; continue; }
       const kind = h.def.kind;
       if (h.tgt && (h.tgt.dead || h.tgt.untargetable || dist(h.x, h.y, h.tgt.x, h.tgt.y) - h.tgt.r > this.heroRange(h))) h.tgt = null;
       // Reload cooldown counts down to exactly 0 and stays there (bar full) until the hero fires again.
-      h.cd = Math.max(0, h.cd - dt);
+      // While a Multi-Shot sequence is still going out the reload waits: it starts once the last bullet is away.
+      if (h.seq <= 0) h.cd = Math.max(0, h.cd - dt);
       h.retryT -= dt; // separate, invisible timer for "nothing to shoot / out of ammo, look again shortly"
       if (kind === 'beam') { this.updateBeam(h, dt); }
       else if (kind === 'flame') { this.updateFlame(h, dt); }
+      else if (h.seq > 0) { this.stepSequence(h, dt); }
       else if (h.cd <= 0 && h.retryT <= 0) {
         const t = this.acquire(h);
         h.tgt = t;
         if (t) {
-          const got = this.takeAmmo(1 + this.mods.proj);
+          const got = this.takeAmmo(1);
           h.dry = got <= 0;
           if (got <= 0) { h.retryT = 0.05; this.ammo.waiting = true; } // empty pile: wait for the revolver
           else {
             const rl = this.reloadTime(h);
             h.cd += rl; h.cdMax = rl;
             if (h.cd < 0) h.cd = 0;
-            this.fire(h, t, got);
+            this.fire(h, t);
             this.ev('pull', { i: h.idx, n: got });
+            // Multi-Shot: the follow-up bullets leave one after another, with no reload gauge in between.
+            h.seq = this.mods.proj; h.seqT = SEQ_GAP;
           }
         } else { h.retryT = 0.05; h.dry = false; }
       }
@@ -656,12 +674,26 @@ export class Game {
     }
   }
 
+  /** Send the next bullet of a Multi-Shot sequence (each one is aimed fresh and uses one ammo). */
+  stepSequence(h, dt) {
+    h.seqT -= dt;
+    if (h.seqT > 0) return;
+    const t = h.tgt || this.acquire(h);
+    h.tgt = t;
+    if (!t) { h.seq = 0; return; }
+    if (this.takeAmmo(1) <= 0) { h.dry = true; this.ammo.waiting = true; h.seqT = 0.05; return; }
+    h.dry = false;
+    h.seq--; h.seqT = SEQ_GAP;
+    this.fire(h, t);
+    this.ev('pull', { i: h.idx, n: 1 });
+  }
+
   muzzle(h) {
     if (h.def.kind === 'drone') return { x: h.x + Math.sin(h.droneT * 1.7) * 24, y: h.y - 44 + Math.sin(h.droneT * 3) * 4 };
     return { x: h.x, y: h.y - 22 };
   }
 
-  fire(h, t, n = 1) {
+  fire(h, t) {
     const base = h.def.base;
     const m = this.muzzle(h);
     const speed = base.speed * (1 + this.mods.speed);
@@ -669,14 +701,13 @@ export class Game {
     const px = t.x + t.vx * tt, py = t.y + t.vy * tt;
     const a0 = Math.atan2(py - m.y, px - m.x);
     const crit = h.deadEyeT > 0 || this.rng.chance(base.crit + this.mods.crit);
-    for (let i = 0; i < n; i++) {
-      const off = (i - (n - 1) / 2) * 0.13;
-      const a = a0 + off + this.rng.range(-base.spread, base.spread);
+    for (let i = 0; i < 1; i++) {
+      const a = a0 + this.rng.range(-base.spread, base.spread);
       const b = this.bullets.spawn();
       b.x = m.x; b.y = m.y; b.vx = Math.cos(a) * speed; b.vy = Math.sin(a) * speed;
       b.src = h; b.kind = h.def.kind; b.r = h.def.kind === 'rocket' ? 5 : h.def.kind === 'sniper' ? 3.5 : 3;
-      b.attack = h.atk * (i === 0 ? 1 : 0.75);
-      b.crit = i === 0 ? crit : this.rng.chance(base.crit + this.mods.crit);
+      b.attack = h.atk;
+      b.crit = crit;
       b.critMult = base.critMult + this.mods.critMult;
       b.pierce = base.pierce + this.mods.pierce + h.rb.pierce;
       b.splashR = (base.splash > 0 ? base.splash : 0) + this.mods.splashR;
@@ -708,6 +739,17 @@ export class Game {
    * Returns true when a burst has just begun.
    */
   startBurst(h) {
+    if (h.seq > 0) { // Multi-Shot: another burst straight away, no reload in between
+      if (h.retryT > 0) return false;
+      const t2 = this.acquire(h);
+      h.tgt = t2;
+      if (!t2) { h.seq = 0; return false; }
+      if (this.takeAmmo(1) <= 0) { h.retryT = 0.05; h.dry = true; this.ammo.waiting = true; return false; }
+      h.dry = false; h.seq--;
+      h.burstT = h.def.base.burst; h.tickCd = 0;
+      this.ev('pull', { i: h.idx, n: 1 });
+      return true;
+    }
     if (h.cd > 0 || h.retryT > 0) return false;
     const t = this.acquire(h);
     h.tgt = t;
@@ -719,6 +761,7 @@ export class Game {
     if (h.cd < 0) h.cd = 0;
     h.burstT = h.def.base.burst;
     h.tickCd = 0;
+    h.seq = this.mods.proj;
     this.ev('pull', { i: h.idx, n: 1 });
     return true;
   }
@@ -738,7 +781,7 @@ export class Game {
     const m = this.muzzle(h);
     const ang = Math.atan2(t.y - m.y, t.x - m.x);
     const ex = m.x + Math.cos(ang) * range, ey = m.y + Math.sin(ang) * range;
-    const width = (boost ? 15 : 7) * (1 + this.mods.proj * 0.25);
+    const width = boost ? 15 : 7;
     h.beam = { x1: m.x, y1: m.y, x2: ex, y2: ey, w: width, boost };
     h.tickCd -= dt;
     if (h.tickCd > 0) return;
@@ -770,7 +813,7 @@ export class Game {
     if (h.tickCd > 0) return;
     h.tickCd = TICK;
     const crit = this.rng.chance(h.def.base.crit + this.mods.crit);
-    const half = 0.42 + this.mods.proj * 0.1;
+    const half = 0.42;
     for (const e of this.enemies) {
       if (e.dead || e.untargetable) continue;
       const dx = e.x - m.x, dy = e.y - m.y;
@@ -974,8 +1017,9 @@ export class Game {
       if (b.dead || b.cutCd > 0) continue;
       const rr = b.r + 9;
       if (pointSegDist2(b.x, b.y, x1, y1, x2, y2) > rr * rr) continue;
-      if (this.cut.energy < 5) break;
-      this.cut.energy -= 5;
+      const cost = 5 * (1 - Math.min(0.5, this.bonus.cutCost));
+      if (this.cut.energy < cost) break;
+      this.cut.energy -= cost;
       b.cutHp--;
       b.cutCd = 0.2;
       this.ev('cut', { x: b.x, y: b.y, big: b.kind === 'bomb' });

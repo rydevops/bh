@@ -365,7 +365,7 @@ test('slicer upgrades: 1 -> 6 loaded chambers, faster hand, deeper pile (capped)
   assert.equal(g.ammo.unlocked, 6, 'hard cap of six');
 });
 
-test('multi-shot: default one bullet per shot, up to five via upgrades, each costing ammo', () => {
+test('multi-shot: default one bullet per shot; upgrades fire up to five in sequence, no reload between, each costing ammo', () => {
   const g = lone(); target(g, 260);
   g.heroes[0].cd = 0; freezeHand(g); g.ammo.pile = 20;
   step(g, 0.03);
@@ -375,12 +375,23 @@ test('multi-shot: default one bullet per shot, up to five via upgrades, each cos
   assert.equal(g2.mods.proj, 4);
   g2.heroes[0].cd = 0; freezeHand(g2); g2.ammo.pile = 20;
   step(g2, 0.03);
-  assert.equal(g2.ammo.taken, 5, 'max: five bullets from one shot');
+  assert.equal(g2.ammo.taken, 1, 'the first bullet leaves immediately');
+  assert.ok(g2.heroes[0].cd >= g2.heroes[0].cdMax - 1e-9 && g2.heroes[0].seq === 4, 'the reload gauge waits while the sequence plays out');
+  step(g2, 0.14 * 4 + 0.1);
+  assert.equal(g2.ammo.taken, 5, 'max: five bullets, one after another');
+  assert.equal(g2.heroes[0].seq, 0);
+  const before = g2.heroes[0].cd;
+  step(g2, 0.2);
+  assert.ok(g2.heroes[0].cd < before, 'the reload only starts after the last bullet');
   const g3 = lone(); target(g3, 260);
   g3.owned = { extended_mag: 4 }; g3.recomputeMods(false);
   g3.heroes[0].cd = 0; freezeHand(g3); g3.ammo.pile = 2;
-  step(g3, 0.03);
-  assert.equal(g3.ammo.taken, 2, 'partial volley when the pile runs short');
+  step(g3, 1);
+  assert.equal(g3.ammo.taken, 2, 'the sequence pauses when the pile runs dry');
+  assert.equal(g3.heroes[0].seq, 3);
+  g3.addAmmo(10);
+  step(g3, 1);
+  assert.equal(g3.heroes[0].seq, 0, 'and finishes once the revolver refills it');
 });
 
 test('cutting an enemy bullet recycles it onto the pile', () => {
@@ -538,4 +549,49 @@ test('difficulty rises smoothly: round pressure is monotonic and round enemy-hit
     for (let k = 8; k < 12; k++) late += hpOf(st, k);
     assert.ok(late > early * 3, `${st.id}: late rounds (${Math.round(late)}) should dwarf early rounds (${Math.round(early)})`);
   }
+});
+
+test('research bonuses reach the simulation: reload, crit, armor, repairs, ammo pile, slicer, cut cost', () => {
+  const a = mk(['vanguard']);
+  const b = mk(['vanguard'], { research: { quick_draw: 4, keen_eye: 5, armor_plating: 5, field_repairs: 4, ammo_crates: 3, slicer_tuning: 4, keen_edge: 3, tactician: 4 } });
+  assert.ok(b.reloadTime(b.heroes[0]) < a.reloadTime(a.heroes[0]) * 0.85 + 1e-9, 'Quick Draw shortens reload by 16%');
+  assert.ok(Math.abs(b.mods.crit - 0.10) < 1e-9);
+  assert.ok(Math.abs(b.mods.reduce - 0.15) < 1e-9);
+  assert.equal(b.ammo.cap, a.ammo.cap + 6);
+  assert.ok(b.ammo.rev < a.ammo.rev);
+  assert.ok(b.mods.regen === 2);
+  assert.ok(Math.abs(b.mods.abilityPower - 0.32) < 1e-9);
+  // Keen Edge: slicing one bullet costs 3.5 CUT energy instead of 5
+  for (const [g, cost] of [[a, 5], [b, 3.5]]) {
+    g.state = 'combat';
+    g.spawnEnemyBullet(100, 100, 0, 0, 1, 4, 1, 'spit');
+    const before = g.cut.energy;
+    assert.equal(g.cutSegment(90, 100, 110, 100), 1);
+    assert.ok(Math.abs(before - g.cut.energy - cost) < 1e-9, `cut cost ${cost}`);
+  }
+});
+
+test('multi-shot also chains beam / flame bursts back to back before the reload starts', () => {
+  const g = fresh(['pulse']);
+  g.spawnQ.length = 0; g.enemies.length = 0;
+  const dummy = g.spawnEnemy('grunt', 10, { y: -500 }); dummy.speed = 0; dummy.hp = dummy.max = 1e12;
+  target(g, 260);
+  g.owned = { extended_mag: 2 }; g.recomputeMods(false);
+  g.heroes[0].cd = 0; freezeHand(g); g.ammo.pile = 20;
+  step(g, 0.05);
+  assert.equal(g.ammo.taken, 1);
+  step(g, 0.5 * 3 + 0.4);
+  assert.equal(g.ammo.taken, 3, 'three bursts for the price of one reload');
+  assert.equal(g.heroes[0].seq, 0);
+});
+
+test('the wave progress bar counts down as a wave is cleared and grows if more enemies appear', () => {
+  const g = fresh(['vanguard']);
+  g.startWave(0);
+  const first = g.waveProgress();
+  assert.ok(first.max > 1 && first.left === first.max, 'starts full');
+  g.spawnQ.shift();
+  assert.equal(g.waveProgress().left, first.max - 1);
+  g.spawnQ.length = 0; g.enemies.length = 0;
+  assert.equal(g.waveProgress().left, 0);
 });

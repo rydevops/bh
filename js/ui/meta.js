@@ -27,6 +27,7 @@ registerScreen('research', () => {
       h('div', { class: 'grow' },
         h('div', { style: { fontWeight: 900 } }, r.name),
         h('div', { class: 'muted', style: { fontSize: '.8rem' } }, lv ? r.desc(lv) : r.perLevel),
+        r.help ? h('div', { class: 'muted', style: { fontSize: '.72rem', opacity: .85 } }, r.help) : null,
         h('div', { class: 'pips' }, Array.from({ length: r.max }, (_, i) => h('i', { class: i < lv ? 'on' : '' })))),
       cost == null
         ? h('span', { class: 'pill', style: { color: '#3fc98a' } }, 'MAX')
@@ -38,6 +39,10 @@ registerScreen('research', () => {
     h('div', { class: 'scroll' },
       h('h2', { class: 'title' }, 'Research'),
       h('p', { class: 'muted', style: { fontSize: '.84rem', margin: '4px 0 12px' } }, 'Permanent bonuses that apply to every run. Research tokens come from bosses, 3-star clears and weekly missions.'),
+      h('div', { class: 'panel', style: { marginBottom: '12px' } },
+        h('div', { style: { fontWeight: 900, marginBottom: '4px' } }, 'What is CUT?'),
+        h('div', { class: 'muted', style: { fontSize: '.8rem', lineHeight: 1.4 } },
+          'Enemies shoot bullets at your wall. Swipe your finger across one to slice it out of the air before it hits. Each slice costs 5 energy from the CUT bar (bottom of the battle screen), the bar slowly refills, heavy bombs need several cuts, and every bullet you fully cut drops into your ammo pile and charges your hero abilities a little.')),
       rows),
     navBar('research'));
   return { el };
