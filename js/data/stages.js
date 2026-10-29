@@ -166,6 +166,14 @@ export function buildWaves(stage, { hard = false } = {}) {
 }
 
 /** Endless wave generator for Survival mode. */
+/** Survival visits the three worlds 10 waves at a time. After a full sweep it starts over, and every enemy stat grows by 1.2x per sweep. */
+export const SURVIVAL_WORLD_WAVES = 10;
+export const SURVIVAL_LOOP_WAVES = SURVIVAL_WORLD_WAVES * WORLDS.length;
+export const SURVIVAL_LOOP_MUL = 1.2;
+/** How many full sweeps of all worlds have been completed when wave index `n` starts. */
+export const survivalLoop = (n) => Math.floor(Math.max(0, n) / SURVIVAL_LOOP_WAVES);
+export const survivalMul = (n) => Math.pow(SURVIVAL_LOOP_MUL, survivalLoop(n));
+
 export function survivalWave(n) {
   const pool = [
     { e: 'grunt', from: 0, w: 3 }, { e: 'runner', from: 1, w: 2 }, { e: 'bulwark', from: 2, w: 1.5 },

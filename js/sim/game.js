@@ -6,7 +6,7 @@ import { clamp, dist, pointSegDist2, Pool, RNG } from '../util.js';
 import { HEROES } from '../data/heroes.js';
 import { ENEMIES, BOSSES, MODIFIERS, statScale } from '../data/enemies.js';
 import { UPGRADES, modsFromUpgrades, rollUpgrades, multishotId } from '../data/upgrades.js';
-import { buildWaves, survivalWave } from '../data/stages.js';
+import { buildWaves, survivalWave, survivalMul, survivalLoop, SURVIVAL_LOOP_WAVES } from '../data/stages.js';
 import { researchBonuses } from '../data/research.js';
 import { attackPower, levelMult, rankBonuses } from '../progression.js';
 import { computeDamage, resistMult, absorb } from './damage.js';
@@ -211,7 +211,11 @@ export class Game {
     this.bannerT = 2.2;
     const isBossWave = groups.some((g) => g.boss);
     this.ev('wave', { wave: i, total: this.waveCount, boss: isBossWave });
+    if (this.survival && i > 0 && i % SURVIVAL_LOOP_WAVES === 0) this.ev('loop', { loop: survivalLoop(i), mul: survivalMul(i) });
   }
+
+  /** Survival: every enemy stat is multiplied by 1.2 per completed sweep of all worlds (compounding). */
+  get loopMul() { return this.survival ? survivalMul(this.waveIdx) : 1; }
 
   scale() {
     const idx = this.survival ? 2 + this.waveIdx * 0.55 : this.stageIdx;
@@ -223,18 +227,20 @@ export class Game {
     const type = def.id;
     const sc = this.scale();
     const m = this.modifier || {};
-    const hp = def.hp * sc.hp * (m.hp || 1);
+    const mul = this.loopMul;
+    const hp = def.hp * sc.hp * (m.hp || 1) * mul;
+    const fireEvery = def.fireEvery ? def.fireEvery / mul : def.fireEvery;
     const e = {
       id: this.nextId++, type, def, boss: null,
       x: x ?? this.rng.range(24, W - 24), y: opts.y ?? -16,
-      hp, max: hp, shield: def.shield * sc.hp, shieldMax: def.shield * sc.hp,
-      armor: clamp(def.armor + (m.armorAdd || 0), 0, 0.8),
-      speed: def.speed * (m.speed || 1), r: def.r,
-      dmg: sc.dmg, regen: m.regen || 0, regenT: 0,
+      hp, max: hp, shield: def.shield * sc.hp * mul, shieldMax: def.shield * sc.hp * mul,
+      armor: clamp((def.armor + (m.armorAdd || 0)) * mul, 0, 0.8),
+      speed: def.speed * (m.speed || 1) * mul, r: def.r, mul, fireEvery,
+      dmg: sc.dmg * mul, regen: (m.regen || 0) * mul, regenT: 0,
       vx: 0, vy: 0, t: this.rng.range(0, 6), zig: this.rng.range(0, 6.28),
       slowF: 1, slowT: 0, burnDps: 0, burnT: 0, burnTick: 0,
       aura: 0, focusN: 0, focusT: 0, flash: 0, pend: 0, dead: false,
-      fireT: this.rng.range(0.8, def.fireEvery || 2), atWall: false,
+      fireT: this.rng.range(0.8, fireEvery || 2), atWall: false,
       holdY: def.holdDist ? this.wallY - def.holdDist : null,
       world: this.stage ? this.stage.world : Math.floor(this.waveIdx / 10) % 3,
       untargetable: false, gated: false, hitFlash: 0,
@@ -467,7 +473,7 @@ export class Game {
         if (def.fly) vx = Math.sin(e.t * 1.6 + e.zig) * 34;
         if (def.behavior === 'ranged' && e.y > 6 && !e.gated) {
           e.fireT -= dt;
-          if (e.fireT <= 0) { e.fireT = def.fireEvery; this.enemyShoot(e); }
+          if (e.fireT <= 0) { e.fireT = e.fireEvery; this.enemyShoot(e); }
         }
       }
       e.vx = vx; e.vy = vy;
@@ -503,7 +509,8 @@ export class Game {
     const tx = clamp(e.x + this.rng.range(-50, 50), 30, W - 30);
     const ty = this.wallY + 4;
     const a = Math.atan2(ty - e.y, tx - e.x);
-    this.spawnEnemyBullet(e.x, e.y + e.r, Math.cos(a) * b.speed, Math.sin(a) * b.speed, b.dmg * e.dmg, b.r, b.cutHp, 'spit');
+    const sp = b.speed * e.mul; // faster bullets after each survival sweep
+    this.spawnEnemyBullet(e.x, e.y + e.r, Math.cos(a) * sp, Math.sin(a) * sp, b.dmg * e.dmg, b.r, b.cutHp, 'spit');
     this.ev('enemyShot', { x: e.x, y: e.y });
   }
 
