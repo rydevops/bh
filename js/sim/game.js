@@ -121,7 +121,7 @@ export class Game {
       atk: attackPower(s.id, s.lv, s.rank),
       // damage per 0.1s tick if the weapon fired continuously (used by Sustained Beam, Firestorm and burn)
       cont: (attackPower(s.id, s.lv, s.rank) * (def.base.volley || 1) * 0.1) / def.base.interval,
-      cd: 0.3 + i * 0.11, cdMax: 0.3 + i * 0.11, burstT: 0, tickCd: 0, dry: false, tgt: null, recoil: 0, disabled: 0, flash: 0,
+      cd: 0.3 + i * 0.11, cdMax: 0.3 + i * 0.11, retryT: 0, burstT: 0, tickCd: 0, dry: false, tgt: null, recoil: 0, disabled: 0, flash: 0,
       ab: { cd: def.ability.cd * 0.35, max: def.ability.cd, active: 0, activeMax: 0 },
       buff: { rate: 1, rateT: 0 },
       deadEyeT: 0, beamBoost: 0, beam: null, flameOn: false, interceptCd: 3,
@@ -631,16 +631,18 @@ export class Game {
       if (h.disabled > 0) { h.beam = null; h.flameOn = false; h.burstT = 0; continue; }
       const kind = h.def.kind;
       if (h.tgt && (h.tgt.dead || h.tgt.untargetable || dist(h.x, h.y, h.tgt.x, h.tgt.y) - h.tgt.r > this.heroRange(h))) h.tgt = null;
-      h.cd -= dt;
+      // Reload cooldown counts down to exactly 0 and stays there (bar full) until the hero fires again.
+      h.cd = Math.max(0, h.cd - dt);
+      h.retryT -= dt; // separate, invisible timer for "nothing to shoot / out of ammo, look again shortly"
       if (kind === 'beam') { this.updateBeam(h, dt); }
       else if (kind === 'flame') { this.updateFlame(h, dt); }
-      else if (h.cd <= 0) {
+      else if (h.cd <= 0 && h.retryT <= 0) {
         const t = this.acquire(h);
         h.tgt = t;
         if (t) {
           const got = this.takeAmmo(1 + this.mods.proj);
           h.dry = got <= 0;
-          if (got <= 0) { h.cd = 0.05; this.ammo.waiting = true; } // empty pile: wait for the revolver
+          if (got <= 0) { h.retryT = 0.05; this.ammo.waiting = true; } // empty pile: wait for the revolver
           else {
             const rl = this.reloadTime(h);
             h.cd += rl; h.cdMax = rl;
@@ -648,7 +650,7 @@ export class Game {
             this.fire(h, t, got);
             this.ev('pull', { i: h.idx, n: got });
           }
-        } else h.cd = 0.05;
+        } else { h.retryT = 0.05; h.dry = false; }
       }
       if (h.id === 'patch') this.updateTriage(h, dt);
     }
@@ -706,11 +708,11 @@ export class Game {
    * Returns true when a burst has just begun.
    */
   startBurst(h) {
-    if (h.cd > 0) return false;
+    if (h.cd > 0 || h.retryT > 0) return false;
     const t = this.acquire(h);
     h.tgt = t;
-    if (!t) { h.cd = 0.05; h.dry = false; return false; }
-    if (this.takeAmmo(1) <= 0) { h.cd = 0.05; h.dry = true; this.ammo.waiting = true; return false; }
+    if (!t) { h.retryT = 0.05; h.dry = false; return false; }
+    if (this.takeAmmo(1) <= 0) { h.retryT = 0.05; h.dry = true; this.ammo.waiting = true; return false; }
     h.dry = false;
     const rl = this.reloadTime(h);
     h.cd += rl; h.cdMax = rl;

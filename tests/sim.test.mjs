@@ -450,6 +450,46 @@ test('every hero has a reload: the next shot cannot come sooner (Vanguard 1.2s) 
   assert.ok(Math.abs(t1 - 1.15) < 0.12, 'second shot ~1.2s after the first: ' + t1);
 });
 
+test('reload bar is stable: a ready hero stays at 0 cooldown (full bar) whether idle, out of ammo or a burst weapon', () => {
+  // idle: nothing to shoot
+  const g = lone(); const h = g.heroes[0];
+  step(g, 1); // let the opening cooldown finish
+  const seen = new Set();
+  for (let i = 0; i < 240; i++) { g.update(1 / 60); seen.add(h.cd); }
+  assert.deepEqual([...seen], [0], 'idle hero keeps cd at exactly 0 (bar stays full, no draining/refilling)');
+  // out of ammo with a target in range
+  const g2 = lone(); target(g2, 260); freezeHand(g2); g2.ammo.pile = 0;
+  step(g2, 1);
+  const seen2 = new Set();
+  for (let i = 0; i < 240; i++) { g2.update(1 / 60); seen2.add(g2.heroes[0].cd); }
+  assert.deepEqual([...seen2], [0], 'dry hero keeps cd at 0');
+  assert.ok(g2.heroes[0].dry);
+  // burst weapons, idle and dry
+  for (const id of ['pulse', 'ember']) {
+    const g3 = fresh([id], { deploy: 'all' });
+    g3.spawnQ.length = 0; g3.enemies.length = 0;
+    const d = g3.spawnEnemy('grunt', 10, { y: -500 }); d.speed = 0; d.hp = d.max = 1e12;
+    step(g3, 1);
+    const seen3 = new Set();
+    for (let i = 0; i < 180; i++) { g3.update(1 / 60); seen3.add(g3.heroes[0].cd); }
+    assert.deepEqual([...seen3], [0], id + ' idle cd stays 0');
+  }
+});
+
+test('reload bar only ever fills between shots: the cooldown never goes UP except at the moment of firing', () => {
+  const g = lone(); target(g, 260); freezeHand(g); g.ammo.pile = 50;
+  const h = g.heroes[0];
+  let prevCd = h.cd, prevShots = h.shots, jumps = 0, fills = 0;
+  for (let i = 0; i < 60 * 8; i++) {
+    g.update(1 / 60);
+    if (h.shots === prevShots) assert.ok(h.cd <= prevCd + 1e-12, `cd rose without a shot (${prevCd} -> ${h.cd}) at frame ${i}`);
+    else jumps++;
+    if (h.cd < prevCd) fills++;
+    prevCd = h.cd; prevShots = h.shots;
+  }
+  assert.ok(jumps >= 5 && fills > 100, `shots=${jumps}, filling frames=${fills}`);
+});
+
 test('Quick Reload: -20% reload per level, at most two levels (-40%)', () => {
   const g = lone(); const h = g.heroes[0];
   const base = g.reloadTime(h);
