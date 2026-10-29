@@ -708,3 +708,29 @@ test('every reward round offers at least one bullet upgrade', () => {
   const picks = rollUpgrades(new RNG(1), { owned, squadTags: new Set(), enemyTags: new Set(), wave: 5, baseFrac: 1, heroes: new Set(['vanguard']) });
   assert.equal(picks.length, 3);
 });
+
+test('every reward round also offers a revolver upgrade (chambers, slicer speed or pile) until they are all maxed', () => {
+  const rng = new RNG(33);
+  const REV = ['slicer_chambers', 'quick_slicer', 'deep_pile'];
+  for (let i = 0; i < 400; i++) {
+    const picks = rollUpgrades(rng, { owned: {}, squadTags: new Set(['rapid']), enemyTags: new Set(['swarm']), wave: i % 15, baseFrac: 1, n: i % 2 ? 3 : 2, heroes: new Set(['vanguard', 'rook']), ammoPressure: 0 });
+    assert.ok(picks.some((id) => REV.includes(id)), 'revolver card in: ' + picks.join(','));
+    assert.ok(picks.some((id) => UPGRADES[id].bullet), 'bullet card in: ' + picks.join(','));
+    assert.equal(new Set(picks).size, picks.length);
+  }
+  const owned = { slicer_chambers: 5, quick_slicer: 3, deep_pile: 3 };
+  const picks = rollUpgrades(new RNG(2), { owned, squadTags: new Set(), enemyTags: new Set(), wave: 4, baseFrac: 1, heroes: new Set(['vanguard']) });
+  assert.equal(picks.length, 3);
+  assert.ok(!picks.some((id) => REV.includes(id)));
+});
+
+test('in a long Survival run the revolver keeps getting offered', () => {
+  const g = new Game({ stage: null, squad: squad('vanguard', 'rook', 'patch'), seed: 9, layout: LAYOUT, emit: false });
+  let seen = 0;
+  for (let w = 0; w < 10; w++) {
+    g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.3);
+    if (g.choices.some((id) => ['slicer_chambers', 'quick_slicer', 'deep_pile'].includes(id))) seen++;
+    g.pickUpgrade(g.choices.find((id) => id.startsWith('summon:')) || g.choices[0]);
+  }
+  assert.ok(seen >= 9, `revolver upgrade offered in ${seen}/10 survival rewards`);
+});

@@ -115,19 +115,19 @@ export const UPGRADES = {
     perLevel: (m) => { m.speed += 0.2; m.dmg += 0.06; },
   },
   slicer_chambers: {
-    id: 'slicer_chambers', name: 'Slicer Chambers', cat: 'ammo', rarity: 'rare', max: 5, icon: 'revolver',
+    id: 'slicer_chambers', revolver: true, name: 'Slicer Chambers', cat: 'ammo', rarity: 'rare', max: 5, icon: 'revolver',
     tags: ['ammo', 'support'], counters: [],
     text: (l) => `The revolver loads ${1 + l} bullets for the slicer hand to cut (max 6)`,
     perLevel: (m) => { m.slicer += 1; },
   },
   quick_slicer: {
-    id: 'quick_slicer', name: 'Quick Slicer', cat: 'ammo', rarity: 'common', max: 3, icon: 'bolt',
+    id: 'quick_slicer', revolver: true, name: 'Quick Slicer', cat: 'ammo', rarity: 'common', max: 3, icon: 'bolt',
     tags: ['ammo', 'rapid'], counters: [],
     text: (l) => `The slicer hand sweeps ${Math.round(l * 15)}% faster${l > 1 ? ' (15% each)' : ''}`,
     perLevel: (m) => { m.cycle += 0.15; },
   },
   deep_pile: {
-    id: 'deep_pile', name: 'Deep Pile', cat: 'ammo', rarity: 'common', max: 3, icon: 'bullet',
+    id: 'deep_pile', revolver: true, name: 'Deep Pile', cat: 'ammo', rarity: 'common', max: 3, icon: 'bullet',
     tags: ['ammo', 'support'], counters: [],
     text: (l) => `The ammo pile holds ${8 * l} more bullets`,
     perLevel: (m) => { m.pile += 8; },
@@ -262,16 +262,20 @@ export function rollUpgrades(rng, { owned, squadTags, enemyTags, wave, baseFrac,
   }
   const out = [];
   const catCount = {};
-  // Every reward round puts at least one bullet upgrade (damage, speed, armor-piercing, frost, explosive, Multi-Shot...)
-  // on the table, so the bullets always have something to grow into.
-  const hasBullet = pool.some((e) => UPGRADES[e.id].bullet);
+  // Every reward round puts a bullet upgrade (damage, speed, armor-piercing, frost, explosive, Multi-Shot...) and a
+  // revolver upgrade (chambers, slicer speed, pile size) on the table, so the ammo economy always has something to grow into.
+  // The first card comes from the bullet set, the second from the revolver set; the rest are rolled freely.
+  const slots = [(u) => u.bullet, (u) => u.revolver];
   for (let k = 0; k < n && pool.length; k++) {
     // Soft variety: cards sharing a category with one already offered are less likely.
-    const weights = pool.map((e) => e.w * (catCount[UPGRADES[e.id].cat] ? 0.5 : 1) * (k === 0 && hasBullet && !UPGRADES[e.id].bullet ? 0 : 1));
+    let weights = pool.map((e) => e.w * (catCount[UPGRADES[e.id].cat] ? 0.5 : 1));
+    const want = slots[k];
+    if (want && pool.some((e) => want(UPGRADES[e.id]))) weights = weights.map((w, i) => (want(UPGRADES[pool[i].id]) ? w : 0));
     const total = weights.reduce((a, b) => a + b, 0);
     let r = rng.next() * total;
     let idx = 0;
     for (; idx < pool.length - 1; idx++) { r -= weights[idx]; if (r <= 0) break; }
+    while (weights[idx] === 0 && idx > 0) idx--; // never fall onto a card the slot rules out
     const pick = pool.splice(idx, 1)[0];
     out.push(pick.id);
     const c = UPGRADES[pick.id].cat;
