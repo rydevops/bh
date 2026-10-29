@@ -372,8 +372,8 @@ test('multi-shot: default one bullet per shot; upgrades fire up to five in seque
   step(g, 0.03);
   assert.equal(g.ammo.taken, 1, 'default: one bullet');
   const g2 = lone(); target(g2, 260);
-  g2.owned = { extended_mag: 4 }; g2.recomputeMods(false);
-  assert.equal(g2.mods.proj, 4);
+  g2.owned = { multishot_vanguard: 4 }; g2.recomputeMods(false);
+  assert.equal(g2.mods.projBy.vanguard, 4);
   g2.heroes[0].cd = 0; freezeHand(g2); g2.ammo.pile = 20;
   step(g2, 0.03);
   assert.equal(g2.ammo.taken, 1, 'the first bullet leaves immediately');
@@ -385,7 +385,7 @@ test('multi-shot: default one bullet per shot; upgrades fire up to five in seque
   step(g2, 0.2);
   assert.ok(g2.heroes[0].cd < before, 'the reload only starts after the last bullet');
   const g3 = lone(); target(g3, 260);
-  g3.owned = { extended_mag: 4 }; g3.recomputeMods(false);
+  g3.owned = { multishot_vanguard: 4 }; g3.recomputeMods(false);
   g3.heroes[0].cd = 0; freezeHand(g3); g3.ammo.pile = 2;
   step(g3, 1);
   assert.equal(g3.ammo.taken, 2, 'the sequence pauses when the pile runs dry');
@@ -577,7 +577,7 @@ test('multi-shot also chains beam / flame bursts back to back before the reload 
   g.spawnQ.length = 0; g.enemies.length = 0;
   const dummy = g.spawnEnemy('grunt', 10, { y: -500 }); dummy.speed = 0; dummy.hp = dummy.max = 1e12;
   target(g, 260);
-  g.owned = { extended_mag: 2 }; g.recomputeMods(false);
+  g.owned = { multishot_pulse: 2 }; g.recomputeMods(false);
   g.heroes[0].cd = 0; freezeHand(g); g.ammo.pile = 20;
   step(g, 0.05);
   assert.equal(g.ammo.taken, 1);
@@ -634,4 +634,37 @@ test('enemies above the engage line (behind the HUD bars) cannot be hit and do n
   const { spawnBoss } = awaitedBosses;
   const b = spawnBoss(g3, 'colossus');
   assert.equal(b.gated, false);
+});
+
+test('Multi-Shot is per hero: each hero has their own card and levels, and only that hero fires the sequence', () => {
+  const g = fresh(['vanguard', 'rook'], { deploy: 'all' });
+  g.spawnQ.length = 0; g.enemies.length = 0;
+  const dummy = g.spawnEnemy('grunt', 10, { y: -500 }); dummy.speed = 0; dummy.hp = dummy.max = 1e12;
+  g.owned = { multishot_rook: 2 }; g.recomputeMods(false);
+  assert.deepEqual(g.mods.projBy, { rook: 2 });
+  const e = g.spawnEnemy('grunt', 180, { y: 260 }); e.speed = 0; e.hp = e.max = 1e12;
+  freezeHand(g); g.ammo.pile = 40;
+  for (const h of g.heroes) h.cd = 0;
+  step(g, 0.05);
+  const [van, rook] = g.heroes;
+  assert.equal(van.seq, 0, 'Vanguard has no Multi-Shot');
+  assert.equal(rook.seq, 2, "Rook's sequence is queued");
+  step(g, 0.6);
+  assert.equal(rook.seq, 0);
+});
+
+test('hero Multi-Shot cards are only offered for heroes on the field, and old checkpoints migrate', () => {
+  const rng = new RNG(5);
+  const base = { owned: {}, squadTags: new Set(), enemyTags: new Set(), wave: 3, baseFrac: 1, n: 3 };
+  const seen = new Set();
+  for (let i = 0; i < 400; i++) for (const id of rollUpgrades(rng, { ...base, heroes: new Set(['vanguard']) })) seen.add(id);
+  assert.ok(seen.has('multishot_vanguard'));
+  assert.ok(![...seen].some((id) => id.startsWith('multishot_') && id !== 'multishot_vanguard'), 'no cards for heroes who are not deployed');
+  const g = fresh(['vanguard', 'rook']);
+  g.owned = { extended_mag: 3, heavy_rounds: 1 };
+  const cp = g.snapshot(1); cp.owned = { extended_mag: 3, heavy_rounds: 1 };
+  const g2 = new Game({ stage: STAGE_BY_ID['1-1'], squad: squad('vanguard', 'rook'), seed: 7, layout: LAYOUT, emit: false, resume: cp });
+  assert.equal(g2.owned.multishot_vanguard, 3, 'old Multi-Shot moves to the lead hero');
+  assert.equal(g2.owned.heavy_rounds, 1);
+  assert.equal(g2.owned.extended_mag, undefined);
 });
