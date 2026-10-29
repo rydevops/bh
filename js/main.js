@@ -12,6 +12,7 @@ import { startCombat, measureSafeArea, inCombat } from './ui/combat.js';
 import { store } from './store.js';
 import { audio } from './audio/index.js';
 import { startTitleScene } from './render/titleScene.js';
+import { loadArt } from './render/art.js';
 import { registerServiceWorker, checkForUpdate, watchForUpdates, currentBuild } from './update.js';
 
 registerScreen('splash', ({ status }) => {
@@ -35,6 +36,7 @@ async function boot() {
   measureSafeArea();
   applySettings();
   installClickSounds();
+  await loadArt(); // sprite sheets first, so the title scene and every portrait are drawn with the real art from the start
   const splash = go('splash', {});
   const { bar, st, btn } = splash.ui;
   const say = (t) => { st.textContent = t; };

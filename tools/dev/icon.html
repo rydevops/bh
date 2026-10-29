@@ -2,6 +2,8 @@
 <canvas id="c"></canvas>
 <script type="module">
 import { heroSprite } from '../../js/render/sprites.js';
+import { loadArt } from '../../js/render/art.js';
+await loadArt(); // Vanguard comes from art/vanguard.png
 const q = new URLSearchParams(location.search);
 const S = +(q.get('size') || 512), maskable = q.get('maskable') === '1';
 const c = document.getElementById('c'); c.width = c.height = S; const ctx = c.getContext('2d');

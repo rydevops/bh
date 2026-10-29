@@ -11,7 +11,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SHIP_DIRS = ['css', 'js', 'icons'];
+const SHIP_DIRS = ['css', 'js', 'icons', 'art'];
 const SHIP_FILES = ['index.html', 'manifest.webmanifest', 'version.json', 'sw.js'];
 const STAMPED = new Set(['js/version.js', 'version.json']);
 const NEVER_PRECACHE = new Set(['sw.js', 'version.json']);

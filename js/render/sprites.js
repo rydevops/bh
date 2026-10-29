@@ -2,6 +2,7 @@
 // at the current render scale. Bold outlines + two-tone shading keep silhouettes readable at phone size.
 
 import { HEROES, skinColors } from '../data/heroes.js';
+import { artFrame } from './art.js';
 
 const OL = '#0e1120';
 const cache = new Map();
@@ -220,9 +221,29 @@ const HERO_DRAW = {
   },
 };
 
-export function heroSprite(id, skinId, scale) {
+/** The procedural hero sprite (the fallback, and what the first sprite sheets were exported from). */
+export function proceduralHero(id, skinId, scale) {
   const c = skinColors(id, skinId);
   return bake(`hero:${id}:${skinId}`, 72, 112, scale, (ctx) => { ctx.translate(0, 12); HERO_DRAW[id](ctx, c); });
+}
+
+/**
+ * A hero sprite for the world. Uses the artist's sprite sheet when there is one for this hero + skin
+ * (`frame` picks idle / fire / ability), otherwise the procedural sprite.
+ */
+export function heroSprite(id, skinId, scale, frame = 'idle') {
+  const fr = artFrame(id, skinId, frame);
+  if (!fr) return proceduralHero(id, skinId, scale);
+  const key = `art:${id}:${skinId}:${frame}@${scale}`;
+  let c = cache.get(key);
+  if (c) return c;
+  c = makeCanvas(Math.ceil(fr.logicalW * scale), Math.ceil(fr.logicalH * scale));
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(fr.img, fr.x, fr.y, fr.w, fr.h, 0, 0, c.width, c.height);
+  c.lw = fr.logicalW; c.lh = fr.logicalH;
+  cache.set(key, c);
+  return c;
 }
 
 /** Small support drone that follows Patch. */
@@ -443,9 +464,15 @@ export function heroPortrait(id, skinId = 'default', size = 96) {
   g.addColorStop(1, '#0d1226');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size * 2, size * 2);
-  const s = heroSprite(id, skinId, 3);
-  const k = (size * 2) / 98;
-  ctx.drawImage(s, size - (s.lw * k) / 2, size * 2 * 0.5 - (s.lh * k) / 2 - 4, s.lw * k, s.lh * k);
+  const icon = artFrame(id, skinId, 'icon');
+  if (icon) { // the artist's square icon, over the same tinted backdrop
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(icon.img, icon.x, icon.y, icon.w, icon.h, 0, 0, size * 2, size * 2);
+  } else {
+    const s = proceduralHero(id, skinId, 3);
+    const k = (size * 2) / 98;
+    ctx.drawImage(s, size - (s.lw * k) / 2, size * 2 * 0.5 - (s.lh * k) / 2 - 4, s.lw * k, s.lh * k);
+  }
   const url = cv.toDataURL ? cv.toDataURL('image/png') : '';
   portraits.set(key, url);
   return url;
