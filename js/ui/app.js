@@ -16,7 +16,16 @@ const mount = () => document.getElementById('screen');
 let current = null; // { name, destroy }
 export const currentScreen = () => current && current.name;
 
+/**
+ * Colour of the solid bar over the status-bar area (#edge). Match it to the top row of whatever is on screen so it blends
+ * in. Pass null for the default menu background.
+ */
+export function setEdgeColor(color) {
+  document.documentElement.style.setProperty('--edge', color || 'var(--bg)');
+}
+
 export function go(name, params = {}) {
+  setEdgeColor(null); // screens that want a different colour (title, combat) set it themselves
   if (current && current.destroy) { try { current.destroy(); } catch (e) { console.error(e); } }
   const fn = screens[name];
   if (!fn) throw new Error('Unknown screen ' + name);

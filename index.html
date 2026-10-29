@@ -11,12 +11,17 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- "black": the app starts below the status bar, so iOS 26 has nothing to blur there. (Needs a re-add to the Home Screen to apply;
+       until then the solid #edge bar below stops the blur on already-installed copies.) -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Bullet Heroes">
   <meta name="format-detection" content="telephone=no">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <!-- Solid, opaque, full-width bar over the status-bar area. iOS 26 blurs/fades whatever sits under the status bar of an installed
+       web app unless a fixed element at the top paints one solid colour. Colour follows the current screen (see setEdgeColor). -->
+  <div id="edge" aria-hidden="true"></div>
   <div id="app">
     <canvas id="game" aria-label="Battlefield"></canvas>
     <div id="screen"></div>
