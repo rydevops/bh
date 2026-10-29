@@ -22,6 +22,8 @@ test('Vanguard sprite sheet is a transparent PNG matching its atlas', () => {
   assert.deepEqual([idle.w, idle.h], [atlas.logical.w * atlas.scale, atlas.logical.h * atlas.scale]);
   assert.deepEqual([fire.w, fire.h, ability.w, ability.h], [idle.w, idle.h, idle.w, idle.h]);
   assert.equal(icon.w, icon.h, 'the icon is square');
+  assert.ok(atlas.animations && atlas.animations.idle.bob.periodMs > 0, 'the artist\'s idle bob timing is carried over');
+  assert.ok(atlas.frames.fire.duration > 0, 'and the fire frame duration');
   const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
   const list = Object.values(atlas.frames);
   for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) assert.ok(!overlaps(list[i], list[j]), 'frames do not overlap');

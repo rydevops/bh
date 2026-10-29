@@ -1,6 +1,6 @@
 {
   "image": "vanguard.png",
-  "scale": 4,
+  "scale": 6,
   "logical": {
     "w": 72,
     "h": 112
@@ -9,26 +9,66 @@
     "idle": {
       "x": 0,
       "y": 0,
-      "w": 288,
-      "h": 448
+      "w": 432,
+      "h": 672,
+      "duration": 800,
+      "loop": true,
+      "description": "Confident planted stance; rifle upright."
     },
     "fire": {
-      "x": 288,
+      "x": 432,
       "y": 0,
-      "w": 288,
-      "h": 448
+      "w": 432,
+      "h": 672,
+      "duration": 100,
+      "loop": false,
+      "description": "Single-shot frame with bright upward muzzle flash; return to idle after playback."
     },
     "ability": {
-      "x": 576,
+      "x": 864,
       "y": 0,
-      "w": 288,
-      "h": 448
+      "w": 432,
+      "h": 672,
+      "duration": 300,
+      "loop": true,
+      "description": "Overdrive stance with golden aura and rising sparks; use for ability duration."
     },
     "icon": {
       "x": 0,
-      "y": 448,
+      "y": 672,
       "w": 256,
-      "h": 256
+      "h": 256,
+      "description": "Head-and-shoulders portrait for hero and ability UI."
+    }
+  },
+  "animations": {
+    "idle": {
+      "frames": [
+        "idle"
+      ],
+      "fps": 1.25,
+      "loop": true,
+      "bob": {
+        "y": 2,
+        "periodMs": 800
+      }
+    },
+    "fire": {
+      "frames": [
+        "fire"
+      ],
+      "fps": 10,
+      "loop": false,
+      "onComplete": "idle",
+      "muzzleDirection": "up"
+    },
+    "overdrive": {
+      "frames": [
+        "ability"
+      ],
+      "fps": 3.33,
+      "loop": true,
+      "muzzleDirection": "up"
     }
   }
 }

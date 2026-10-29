@@ -31,7 +31,7 @@ export async function loadArt() {
       const atlasUrl = new URL(atlasPath, base());
       const atlas = await (await fetch(atlasUrl)).json();
       const img = await loadImage(new URL(atlas.image, atlasUrl).href);
-      loaded.set(key, { img, frames: atlas.frames, scale: atlas.scale, w: atlas.logical.w, h: atlas.logical.h });
+      loaded.set(key, { img, frames: atlas.frames, animations: atlas.animations || {}, scale: atlas.scale, w: atlas.logical.w, h: atlas.logical.h });
     } catch (e) {
       console.warn('[art] falling back to procedural art for', key, e.message);
       loaded.set(key, null);
@@ -48,6 +48,23 @@ export function artFrame(heroId, skinId, name = 'idle') {
   if (!sh) return null;
   const f = sh.frames[name] || sh.frames.idle;
   return f ? { img: sh.img, x: f.x, y: f.y, w: f.w, h: f.h, logicalW: sh.w, logicalH: sh.h } : null;
+}
+
+/**
+ * Timings the artist put in the atlas, or null for procedural heroes:
+ *   bobY / bobSec  idle bob (total travel in world px, period in seconds)
+ *   fireSec        how long the `fire` frame stays up after a shot
+ */
+export function artAnim(heroId, skinId) {
+  const sh = artSheet(heroId, skinId);
+  if (!sh) return null;
+  const bob = (sh.animations.idle || {}).bob;
+  const fire = sh.frames.fire || {};
+  return {
+    bobY: bob && bob.y > 0 ? bob.y : null,
+    bobSec: bob && bob.periodMs > 0 ? bob.periodMs / 1000 : null,
+    fireSec: fire.duration > 0 ? fire.duration / 1000 : null,
+  };
 }
 
 export function hasArtFrame(heroId, skinId, name) {
