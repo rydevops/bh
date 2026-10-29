@@ -19,8 +19,8 @@ export function background(world, H, wallY, scale) {
 
   // sky / far field
   const g = ctx.createLinearGradient(0, 0, 0, wallY);
-  g.addColorStop(0, pal.top);
-  g.addColorStop(0.35, pal.mid);
+  // Starts at the mid tone (not the darker `top` tone) so the top edge of the screen never fades to black.
+  g.addColorStop(0, pal.mid);
   g.addColorStop(1, pal.bottom);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);

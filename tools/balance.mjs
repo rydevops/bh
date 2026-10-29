@@ -27,6 +27,7 @@ export function playRun({ stage, hard = false, squad, seed = 1, research = {}, c
         if (id.startsWith('summon:')) return 99; // a sensible player always takes the new hero
         if (id === 'slicer_chambers') return 50 + g.ammo.starve * 40; // ...and feeds the revolver when heroes are waiting on ammo
         if (id === 'quick_slicer' || id === 'deep_pile') return 4 + g.ammo.starve * 25 + rng();
+        if (id === 'quick_reload') return 30; // two levels, -20% reload each: always worth it
         const u = UPGRADES[id];
         let s = rng();
         if (u.cat === 'defense' && g.base.hp / g.base.max < 0.6) s += 1.2;

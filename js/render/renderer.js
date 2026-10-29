@@ -1,7 +1,7 @@
 // Canvas presentation layer. Reads the simulation, never mutates it.
 // Particles, damage numbers and screen shake live here (GDD 13.2 presentation layer).
 
-import { W } from '../sim/game.js';
+import { W, CHAMBER_ORDER } from '../sim/game.js';
 import { WORLDS } from '../data/stages.js';
 import { skinColors } from '../data/heroes.js';
 import { enemySprite, bossSprite, heroSprite, droneSprite, turretSprite, flashOf, clearSpriteCache, WORLD_PAL } from './sprites.js';
@@ -13,10 +13,12 @@ const MAX_PARTS = 520;
 const MAX_NUMS = 40;
 
 export const TRAY_CSS = 128; // px reserved at the bottom for ability buttons / cut meter
-export const STRIP = 62; // world px between the heroes' feet and the tray: the revolver / ammo pile strip
+export const STRIP = 66; // world px between the heroes' feet and the tray: the revolver / ammo pile strip
 /** Where ammo is drawn, in world coordinates. */
 export const REV = { cx: 58, pileX: 218 };
-export const stripY = (g) => g.heroY + 66;
+export const stripY = (g) => g.heroY + 70;
+/** Centre of chamber `slot` (0 = 12 o'clock, clockwise) on the static revolver. */
+export const chamberPos = (g, slot) => { const a = -Math.PI / 2 + (slot * Math.PI) / 3; return { x: REV.cx + Math.cos(a) * 14.5, y: stripY(g) + Math.sin(a) * 14.5 }; };
 
 /** World layout for a given viewport: wall + hero row sit above the bottom tray. */
 export function layoutFor(cssW, cssH, safeBottom = 0) {
@@ -112,14 +114,11 @@ export class Renderer {
           this.spawn('dot', e.x, e.y - 2, 0, -30, 0.08, e.kind === 'rocket' ? 7 : 4, '#fff');
           break;
         }
-        case 'slice': {
-          const ry = stripY(g), n = Math.min(e.n, 6);
-          this.burst(REV.cx + 30, ry - 6, 5, 150, 0.2, 1.8, '#fff6c8');
-          for (let k = 0; k < n; k++) {
-            const life = 0.28 + k * 0.03;
-            const tx = REV.pileX + this.rng.range(-26, 26), ty = ry - 6;
-            this.spawn('shell', REV.cx + 36, ry + 4, (tx - REV.cx - 36) / life, (ty - ry - 4) / life, life, 1, '#e0a93a');
-          }
+        case 'slice': { // the hand cut a loaded chamber: the bullet drops down the chute onto the pile
+          const ry = stripY(g), c = chamberPos(g, e.slot), life = 0.34;
+          this.burst(c.x, c.y, 4, 120, 0.18, 1.6, '#fff6c8');
+          const tx = REV.pileX + this.rng.range(-26, 26), ty = ry - 6;
+          this.spawn('shell', c.x, c.y, (tx - c.x) / life, (ty - c.y) / life, life, 1, '#e0a93a');
           break;
         }
         case 'pull': {
@@ -333,54 +332,58 @@ export class Renderer {
     }
   }
 
-  /** The revolver (slicer cuts bullets from the cylinder) and the pile heroes draw ammo from. */
+  /**
+   * The revolver is static. A clock-hand "slicer" sweeps around it; every loaded chamber it passes gets cut and the
+   * bullet drops onto the pile that heroes draw from. Locked chambers (not yet unlocked by upgrades) are crossed out.
+   */
   drawRevolver(ctx, g) {
     const a = g.ammo, ry = stripY(g), cx = REV.cx, px = REV.pileX;
     // backing tray
     ctx.fillStyle = 'rgba(4,7,18,.55)';
     ctx.beginPath(); ctx.roundRect(8, ry - 28, W - 16, 56, 14); ctx.fill();
     ctx.strokeStyle = 'rgba(120,150,230,.35)'; ctx.lineWidth = 1.5; ctx.stroke();
-    // chute from the slicer to the pile
+    // chute from the cylinder to the pile
     ctx.fillStyle = '#4a5370'; ctx.strokeStyle = '#10131f'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(cx + 26, ry + 4); ctx.lineTo(px - 52, ry + 20); ctx.lineTo(px - 52, ry + 25); ctx.lineTo(cx + 26, ry + 10); ctx.closePath(); ctx.fill(); ctx.stroke();
 
-    // --- cylinder: 6 chambers; the unlocked ones (slicer upgrades) are loaded, the rest are dim
-    const ease = (t) => t * t * (3 - 2 * t);
-    const full = a.pile >= a.cap;
-    const rot = (a.rotN + (full ? 0 : ease(Math.min(1, a.t / a.cycle)))) * (Math.PI / 3);
+    // --- static cylinder with 6 chambers and clock ticks
     ctx.save(); ctx.translate(cx, ry);
     const body = ctx.createRadialGradient(-6, -6, 3, 0, 0, 25);
     body.addColorStop(0, '#9aa6c4'); body.addColorStop(1, '#4a5370');
     ctx.fillStyle = body; ctx.strokeStyle = '#10131f'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(0, 0, 24, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.rotate(rot);
-    for (let i = 0; i < 6; i++) {
-      const ang = (i * Math.PI) / 3;
+    ctx.strokeStyle = 'rgba(10,14,30,.55)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 12; i++) { const t = (i * Math.PI) / 6; ctx.beginPath(); ctx.moveTo(Math.cos(t) * 21.5, Math.sin(t) * 21.5); ctx.lineTo(Math.cos(t) * 23.5, Math.sin(t) * 23.5); ctx.stroke(); }
+    for (let slot = 0; slot < 6; slot++) {
+      const ang = -Math.PI / 2 + (slot * Math.PI) / 3;
       const x = Math.cos(ang) * 14.5, y = Math.sin(ang) * 14.5;
-      const live = i < a.perCycle;
+      const live = CHAMBER_ORDER.indexOf(slot) < a.unlocked;
+      const fl = a.flash[slot] > 0 ? a.flash[slot] / 0.25 : 0;
       ctx.fillStyle = '#151a2c'; ctx.strokeStyle = live ? '#d8b14a' : '#10131f'; ctx.lineWidth = live ? 1.5 : 1;
       ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fill(); ctx.stroke();
-      if (live) { ctx.fillStyle = '#e0a93a'; ctx.beginPath(); ctx.arc(x, y, 4.2, 0, 7); ctx.fill(); ctx.fillStyle = '#fff2b0'; ctx.beginPath(); ctx.arc(x - 1.2, y - 1.2, 1.4, 0, 7); ctx.fill(); }
-      else { ctx.strokeStyle = 'rgba(90,100,140,.8)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x - 2, y - 2); ctx.lineTo(x + 2, y + 2); ctx.moveTo(x + 2, y - 2); ctx.lineTo(x - 2, y + 2); ctx.stroke(); }
+      if (live) {
+        ctx.fillStyle = fl > 0 ? '#fff6c8' : '#e0a93a'; ctx.beginPath(); ctx.arc(x, y, 4.2 + fl * 1.2, 0, 7); ctx.fill();
+        ctx.fillStyle = '#fff2b0'; ctx.beginPath(); ctx.arc(x - 1.2, y - 1.2, 1.4, 0, 7); ctx.fill();
+        if (fl > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,230,140,${fl * 0.7})`; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
+      } else { ctx.strokeStyle = 'rgba(90,100,140,.8)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x - 2, y - 2); ctx.lineTo(x + 2, y + 2); ctx.moveTo(x + 2, y - 2); ctx.lineTo(x - 2, y + 2); ctx.stroke(); }
     }
-    ctx.rotate(-rot);
-    ctx.fillStyle = '#2b3350'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.restore();
 
-    // --- slicer blade (swings down at the end of each cycle)
-    const prog = Math.min(1, a.t / a.cycle);
-    const sw = a.sliceFlash > 0 ? 1 - a.sliceFlash / 0.18 : prog > 0.78 ? (prog - 0.78) / 0.22 : 0;
-    const ang = -0.9 + 1.5 * (a.sliceFlash > 0 ? 1 - sw * 0.6 : sw);
-    ctx.save(); ctx.translate(cx + 30, ry - 20); ctx.rotate(ang);
-    ctx.fillStyle = '#dfe6f7'; ctx.strokeStyle = '#10131f'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(30, 1); ctx.lineTo(0, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#5a6382'; ctx.beginPath(); ctx.arc(0, 1, 3, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.restore();
-    if (a.sliceFlash > 0) {
-      ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = '#fff6c8'; ctx.globalAlpha = a.sliceFlash / 0.18; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(cx + 22, ry - 14); ctx.lineTo(cx + 44, ry + 6); ctx.stroke();
-      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    // --- the slicer: a clock hand on top of the revolver (fading sweep trail behind it)
+    const ha = -Math.PI / 2 + ((a.ph % 6) / 6) * Math.PI * 2;
+    const trail = ctx.createConicGradient ? ctx.createConicGradient(ha - 1.1, 0, 0) : null;
+    if (trail) {
+      trail.addColorStop(0, 'rgba(255,240,170,0)'); trail.addColorStop(1 / (Math.PI * 2) * 1.1, 'rgba(255,240,170,.38)'); trail.addColorStop(1 / (Math.PI * 2) * 1.1 + 0.001, 'rgba(255,240,170,0)'); trail.addColorStop(1, 'rgba(255,240,170,0)');
+      ctx.fillStyle = trail; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 25, ha - 1.1, ha); ctx.closePath(); ctx.fill();
     }
+    ctx.rotate(ha);
+    ctx.fillStyle = '#e9eef9'; ctx.strokeStyle = '#10131f'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-8, -1.8); ctx.lineTo(26, -0.8); ctx.lineTo(32, 0); ctx.lineTo(26, 0.8); ctx.lineTo(-8, 1.8); ctx.closePath(); ctx.fill(); ctx.stroke(); // blade
+    ctx.fillStyle = '#ff4a4a'; ctx.beginPath(); ctx.moveTo(24, -1); ctx.lineTo(32, 0); ctx.lineTo(24, 1); ctx.closePath(); ctx.fill(); // red tip
+    ctx.fillStyle = '#4a5370'; ctx.beginPath(); ctx.arc(-9, 0, 3, 0, 7); ctx.fill(); ctx.stroke(); // counterweight
+    ctx.restore();
+    ctx.save(); ctx.translate(cx, ry);
+    ctx.fillStyle = '#2b3350'; ctx.strokeStyle = '#10131f'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, 7); ctx.fill(); ctx.stroke(); // pivot cap
+    ctx.restore();
 
     // --- the pile: a heap of brass shells (one per bullet, up to what fits), plus the count
     const count = Math.floor(a.pile), shown = Math.min(count, 36);
@@ -403,7 +406,7 @@ export class Renderer {
     ctx.strokeText(label, px + 46, ry + 4); ctx.fillStyle = starving ? '#ff7a6a' : '#ffe9a0'; ctx.fillText(label, px + 46, ry + 4);
     ctx.globalAlpha = 1;
     ctx.font = '800 9px system-ui, sans-serif'; ctx.fillStyle = 'rgba(190,205,255,.75)';
-    ctx.fillText(`${a.perCycle} PER CUT`, px + 46, ry + 17);
+    ctx.fillText(`${a.unlocked}/6 LOADED`, px + 46, ry + 17);
     ctx.textAlign = 'center';
   }
 
@@ -514,6 +517,7 @@ export class Renderer {
           this.star(ctx, h.x + Math.cos(a) * 14, h.y - 38 + Math.sin(a) * 4, 3.2);
         }
       }
+      if (h.spawnT <= 0) this.drawReloadBar(ctx, h, c);
       if (h.dry && !dis) { // waiting on the revolver
         ctx.globalAlpha = 0.6 + 0.4 * Math.sin(this.t * 10);
         ctx.fillStyle = '#ff5a4a'; ctx.beginPath(); ctx.roundRect(h.x - 4, h.y - 52, 8, 14, 3); ctx.fill();
@@ -529,6 +533,20 @@ export class Renderer {
       if (h.beam && !dis) this.drawBeam(ctx, h, c);
       if (h.deadEyeT > 0) { ctx.strokeStyle = 'rgba(255,60,60,.7)'; ctx.lineWidth = 1; if (h.tgt) { ctx.setLineDash([4, 5]); ctx.beginPath(); const m = g.muzzle(h); ctx.moveTo(m.x, m.y); ctx.lineTo(h.tgt.x, h.tgt.y); ctx.stroke(); ctx.setLineDash([]); } }
     }
+  }
+
+  /** Progress bar under a hero: fills as the weapon reloads; glows when the next shot is ready; red when out of ammo. */
+  drawReloadBar(ctx, h, c) {
+    const bw = 46, bx = h.x - bw / 2, by = h.y + 32;
+    const ready = h.cd <= 0;
+    const p = h.dry || ready ? 1 : Math.max(0, Math.min(1, 1 - h.cd / (h.cdMax || 1)));
+    ctx.fillStyle = 'rgba(4,7,18,.85)';
+    ctx.beginPath(); ctx.roundRect(bx - 1.5, by - 1.5, bw + 3, 7, 3.5); ctx.fill();
+    ctx.fillStyle = h.dry ? '#ff5a4a' : ready ? '#ffffff' : c.glow;
+    if (h.dry && !this.settings.reduceFlash) ctx.globalAlpha = 0.5 + 0.5 * Math.sin(this.t * 10);
+    ctx.beginPath(); ctx.roundRect(bx, by, Math.max(3, bw * p), 4, 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    if (ready && !h.dry) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = c.glow + '66'; ctx.beginPath(); ctx.roundRect(bx - 2, by - 2, bw + 4, 8, 4); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
   }
 
   star(ctx, x, y, r) {

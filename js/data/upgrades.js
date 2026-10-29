@@ -17,7 +17,7 @@ export function defaultMods() {
     dmg: 0, rate: 0, crit: 0, critMult: 0, pierce: 0, speed: 0, range: 0, proj: 0,
     splashR: 0, splashFrac: 0, armorPierce: 0, haste: 0, burn: 0, frost: 0,
     turrets: 0, turretDmg: 0, turretRate: 0, focus: 0, homing: 0,
-    reduce: 0, hpMult: 0, regen: 0, coin: 0, cut: 0, rerolls: 0,
+    reduce: 0, hpMult: 0, regen: 0, coin: 0, cut: 0, rerolls: 0, reload: 0,
     slicer: 0, cycle: 0, pile: 0, // revolver: extra bullets per cut, cycle speed-up, pile capacity
     abilityPower: 0, abilityTargets: 0,
   };
@@ -27,11 +27,11 @@ const p = (v) => Math.round(v * 100) + '%';
 
 export const UPGRADES = {
   // ---------- Skill ----------
-  quick_trigger: {
-    id: 'quick_trigger', name: 'Quick Trigger', cat: 'skill', rarity: 'common', max: 5, icon: 'bolt',
-    tags: ['rapid', 'ballistic', 'energy', 'fire'], counters: ['swarm', 'fast'],
-    text: (l) => `Attack speed +${p(0.1 * l)}${l > 1 ? ' (+10% each)' : ''}`,
-    perLevel: (m) => { m.rate += 0.1; },
+  quick_reload: {
+    id: 'quick_reload', name: 'Quick Reload', cat: 'skill', rarity: 'rare', max: 2, icon: 'bolt',
+    tags: ['rapid', 'ballistic', 'energy', 'fire', 'sniper'], counters: ['swarm', 'fast'],
+    text: (l) => `Every hero's reload time -${20 * l}%${l > 1 ? ' (-20% each)' : ''}`,
+    perLevel: (m) => { m.reload += 0.2; },
   },
   overclock: {
     id: 'overclock', name: 'Overclock', cat: 'skill', rarity: 'rare', max: 4, icon: 'clock',
@@ -118,13 +118,13 @@ export const UPGRADES = {
   slicer_chambers: {
     id: 'slicer_chambers', name: 'Slicer Chambers', cat: 'ammo', rarity: 'rare', max: 5, icon: 'revolver',
     tags: ['ammo', 'support'], counters: [],
-    text: (l) => `The revolver slices ${1 + l} bullets per cycle (max 6)`,
+    text: (l) => `The revolver loads ${1 + l} bullets for the slicer hand to cut (max 6)`,
     perLevel: (m) => { m.slicer += 1; },
   },
   quick_slicer: {
     id: 'quick_slicer', name: 'Quick Slicer', cat: 'ammo', rarity: 'common', max: 3, icon: 'bolt',
     tags: ['ammo', 'rapid'], counters: [],
-    text: (l) => `Slicer cycle ${Math.round(l * 15)}% faster${l > 1 ? ' (15% each)' : ''}`,
+    text: (l) => `The slicer hand sweeps ${Math.round(l * 15)}% faster${l > 1 ? ' (15% each)' : ''}`,
     perLevel: (m) => { m.cycle += 0.15; },
   },
   deep_pile: {

@@ -32,7 +32,8 @@ const POWER_WEIGHT = { vanguard: 1.05, rook: 1.5, patch: 2.7, pulse: 1.45, spect
 export function heroDps(heroId, lv, rank) {
   const h = HEROES[heroId];
   const crit = 1 + h.base.crit * (h.base.critMult - 1);
-  return (attackPower(heroId, lv, rank) * crit) / h.base.interval;
+  // `volley` = damage instances per shot (beam/flame bursts tick several times per shot).
+  return (attackPower(heroId, lv, rank) * (h.base.volley || 1) * crit) / h.base.interval;
 }
 
 export function heroPower(heroId, lv, rank) {

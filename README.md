@@ -18,8 +18,11 @@ Locally: `npm run serve` → <http://localhost:8080>
 ### How to play
 
 - Every stage is **12 rounds**, and the opening rounds are gentle: each battle starts with **just your lead hero** (squad slot 1). After a round, the reward cards may include a gold **Summon** card that calls the next squad member into the fight. It is **random** (50% per reward round) but you never go two reward rounds in a row without one. You choose the join order in the Squad screen.
-- **Ammo / the revolver:** heroes don't have unlimited bullets. A revolver's **slicer** cuts bullets from its cylinder into the **ammo pile** (bottom of the screen), and every hero shot takes bullets from that pile. If the pile runs dry, heroes **wait for the slicer**. It starts at **1 bullet per cut**; *Slicer Chambers* upgrades raise this up to **6**, *Quick Slicer* speeds the cycle and *Deep Pile* raises capacity. Each hero fires **one bullet per shot** by default, up to **5** with *Multi-Shot* upgrades (each extra bullet costs ammo). Cutting enemy bullets with a swipe **recycles them into the pile**.
+- **Ammo / the revolver:** heroes don't have unlimited bullets. The revolver sits under your squad with six chambers. A **clock-hand slicer** sweeps around it (once every 1.2s), and **every loaded chamber it passes drops one bullet onto the ammo pile**. Every hero shot takes a bullet from the pile; if the pile is empty heroes **wait for the hand** (they show a red marker). You start with **one loaded chamber**; *Slicer Chambers* upgrades load more (up to **6**), *Quick Slicer* makes the hand sweep faster and *Deep Pile* raises capacity. Swiping across enemy bullets **recycles them into the pile**.
+- **Reload bars:** every hero has a reload time and a **progress bar under their feet** showing when the next shot fires (white = ready, red = out of ammo). Beam and flame heroes fire a short burst per bullet, then reload. *Quick Reload* (2 levels) cuts every hero's reload by 20% each.
+- Each hero fires **one bullet per shot** by default, up to **5** with *Multi-Shot* upgrades (each extra bullet costs ammo).
 - **2× speed** is locked until you have cleared that stage once.
+- The **title screen** is an animated diorama that cycles through the three worlds (drifting clouds, crows, patrolling drones, searchlights, floating spores) while your squad shoots at enemies marching toward the wall. It shows a single still frame if you enable *Reduce flashing* or your device asks for reduced motion.
 - Heroes defend a wall at the bottom of the screen and **fire automatically** (as long as there is ammo).
 - **Swipe across enemy bullets to cut them** out of the air (limited by the CUT meter). Heavy bombs need several cuts.
 - **Tap a hero portrait** (or keys `1`–`4`) to use their ability. Cutting bullets charges abilities.
@@ -59,7 +62,7 @@ Requires Node 22+. No dependencies, no bundler — the game is plain ES modules.
 | Command | What it does |
 | --- | --- |
 | `npm run serve` | Static server on :8080 |
-| `npm test` | 56 unit/integration tests (simulation, economy, saves, PWA invariants) |
+| `npm test` | 61 unit/integration tests (simulation, economy, saves, PWA invariants) |
 | `npm run e2e` | Real-browser tests: every screen, summon flow, settings and reset, and the auto-update flow (needs Playwright) |
 | `npm run balance` | Headless bot plays every stage and prints win rates (`LVMUL=0.7 npm run balance` to test under-levelled squads) |
 | `npm run stamp` | Re-stamp `sw.js`, `js/version.js`, `version.json` (run after changing shipped files) |
@@ -87,7 +90,7 @@ tests/         node:test suites
 | §3 loop, §4 combat | Auto-targeting (closest to wall, overkill avoidance, stable retargeting), pooled projectiles with pierce/splash/crit/elements, formula `Attack × Skill × Crit × Resistance`, shields + armor + armor-piercing, pause on interruption, checkpoint/resume |
 | §4.4 bullet cutting | Swipe-to-cut enemy projectiles with a regenerating CUT meter; bombs need multiple cuts. *(The GDD asks that the exact mechanic be verified against the reference game — this is one of its listed alternatives.)* |
 | §3/§5 summon format | Battles deploy only the lead hero; the rest of the squad is summoned by *random* reward cards (50% per reward round, with a pity rule: never two rounds in a row without one) |
-| §7.3 ammunition model | Revolver + slicer + ammo pile (see How to play): shared limited ammo, 1→6 bullets per cut via upgrades, 1→5 bullets per shot via upgrades |
+| §7.3 ammunition model | Static revolver + clock-hand slicer + ammo pile (see How to play): shared limited ammo, 1→6 loaded chambers via upgrades, 1→5 bullets per shot via upgrades; per-hero reload cooldowns with progress bars |
 | §9 stage structure | 12 rounds per stage. Each round's enemy budget is derived from the damage a typical player's hero can deal in that round's time window × a smooth round curve × a gentle stage ramp (`buildWaves`, `TUNE` in `js/data/enemies.js`), so counts stay sane while enemy health scales |
 | §5 heroes | Vanguard, Rook, Pulse, Patch from the GDD **+ Specter and Ember** (6 total), each with an active ability, passive, 4 rank perks, skins; 3 squad slots → 4 after stage 2-2; no duplicates; saved presets; strengths/gaps analysis |
 | §6 enemies | Grunt, Runner, Bulwark, Sentinel (+ Spitter, Drone, Splitter, Slimeling = 8 archetypes) and 3 world bosses with phases, telegraphs and vulnerability windows; `Health(stage) = Base × (1 + α·stage)` |

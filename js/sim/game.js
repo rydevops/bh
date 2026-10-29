@@ -14,6 +14,9 @@ import { spawnBoss, updateBoss, bossDamageHook, killAllMinions } from './bosses.
 
 export const W = 360;
 const STEP_MAX = 1 / 30;
+/** Order in which chambers become loaded (spread around the ring so a 2nd chamber sits opposite the 1st, etc). */
+export const CHAMBER_ORDER = [0, 3, 1, 4, 2, 5];
+const TICK = 0.1; // beam / flame damage tick
 /** Chance that a post-wave reward round offers a new hero (guaranteed after one miss). */
 export const SUMMON_CHANCE = 0.5;
 
@@ -78,9 +81,12 @@ export class Game {
 
     // Revolver ammo economy: the slicer cuts bullets from the cylinder into a pile; heroes draw from the pile.
     // Base output (1 bullet / 0.36s) exactly feeds one rifle; upgrades raise it to 6 per cycle.
+    // The revolver is static: 6 chambers around a ring. The slicer is a clock hand that sweeps around it once every
+    // `rev` seconds, and each LOADED (unlocked) chamber it passes drops one bullet onto the pile.
+    // Base: 1 loaded chamber, one sweep per 1.2s = 1 bullet/s (exactly one Vanguard's appetite).
     this.ammo = {
-      pile: 6, cap0: 12, cap: 12, t: 0, cycleBase: 0.36, cycle: 0.36, perCycle: 1,
-      made: 0, taken: 0, waiting: false, starve: 0, sliceFlash: 0, rotN: 0,
+      pile: 6, cap0: 12, cap: 12, ph: 5.2, revBase: 1.2, rev: 1.2, unlocked: 1,
+      made: 0, taken: 0, waiting: false, starve: 0, flash: [0, 0, 0, 0, 0, 0],
     };
     this.summonMissed = 0;
     this.summonOffer = false;
@@ -113,7 +119,9 @@ export class Game {
       idx: i, id: s.id, def, lv: s.lv, rank: s.rank, skin: s.skin || 'default', rb,
       x: W / 2, tx: W / 2, y: this.heroY, spawnT: 0,
       atk: attackPower(s.id, s.lv, s.rank),
-      cd: 0.3 + i * 0.11, tgt: null, recoil: 0, disabled: 0, flash: 0,
+      // damage per 0.1s tick if the weapon fired continuously (used by Sustained Beam, Firestorm and burn)
+      cont: (attackPower(s.id, s.lv, s.rank) * (def.base.volley || 1) * 0.1) / def.base.interval,
+      cd: 0.3 + i * 0.11, cdMax: 0.3 + i * 0.11, burstT: 0, tickCd: 0, dry: false, tgt: null, recoil: 0, disabled: 0, flash: 0,
       ab: { cd: def.ability.cd * 0.35, max: def.ability.cd, active: 0, activeMax: 0 },
       buff: { rate: 1, rateT: 0 },
       deadEyeT: 0, beamBoost: 0, beam: null, flameOn: false, interceptCd: 3,
@@ -138,7 +146,7 @@ export class Game {
     const h = this.reserve.splice(k, 1)[0];
     this.heroes.push(h);
     this.layoutHeroes();
-    h.x = h.tx; h.spawnT = 0.8; h.cd = 0.4;
+    h.x = h.tx; h.spawnT = 0.8; h.cd = h.cdMax = 0.4;
     h.ab.cd = h.ab.max * 0.5;
     this.ev('summon', { i: h.idx, id: h.id, x: h.x, y: h.y });
     return true;
@@ -152,8 +160,8 @@ export class Game {
     if (delta > 0) this.base.hp += delta;
     this.cut.max = 100 * (1 + this.mods.cut + this.bonus.cut);
     const am = this.ammo;
-    am.perCycle = Math.min(6, 1 + this.mods.slicer);
-    am.cycle = am.cycleBase * (1 - Math.min(0.6, this.mods.cycle));
+    am.unlocked = Math.min(6, 1 + this.mods.slicer);
+    am.rev = am.revBase * (1 - Math.min(0.6, this.mods.cycle));
     am.cap = am.cap0 + this.mods.pile;
     if (initial) this.cut.energy = this.cut.max;
     // Turrets (GDD 7.2): flank positions on the wall.
@@ -540,6 +548,8 @@ export class Game {
     if (h.deadEyeT > 0) m *= 2;
     return m;
   }
+  /** Seconds between shots for a hero: base reload, sped up by buffs/passives and by Quick Reload upgrades (-20% each). */
+  reloadTime(h) { return (h.def.base.interval / this.heroRate(h)) * (1 - Math.min(0.6, this.mods.reload)); }
   heroRange(h) { return h.def.base.range * (1 + this.mods.range); }
 
   /** Skill multiplier shared by all damage from a hero against a particular enemy. */
@@ -592,12 +602,14 @@ export class Game {
   // ------------------------------------------------------------------ revolver ammo
   updateAmmo(dt) {
     const a = this.ammo;
-    if (a.sliceFlash > 0) a.sliceFlash -= dt;
-    a.t += dt;
-    if (a.t >= a.cycle) {
-      const n = Math.min(a.perCycle, Math.floor(a.cap - a.pile));
-      if (n > 0) { a.t -= a.cycle; a.pile += n; a.made += n; a.rotN++; a.sliceFlash = 0.18; this.ev('slice', { n }); }
-      else a.t = a.cycle; // pile full: the slicer waits with the cut ready
+    for (let j = 0; j < 6; j++) if (a.flash[j] > 0) a.flash[j] -= dt;
+    const prev = a.ph;
+    a.ph += (6 / a.rev) * dt; // chamber-units; 6 per revolution
+    for (let k = Math.floor(prev) + 1; k <= Math.floor(a.ph); k++) {
+      const slot = k % 6;
+      if (CHAMBER_ORDER.indexOf(slot) >= a.unlocked) continue; // a locked chamber: nothing to cut
+      a.flash[slot] = 0.25;
+      if (a.pile < a.cap) { a.pile += 1; a.made += 1; this.ev('slice', { slot }); }
     }
     // How long recently was a hero waiting on the revolver? Drives the "feed the squad" upgrade weighting.
     a.starve += ((a.waiting ? 1 : 0) - a.starve) * Math.min(1, dt / 3);
@@ -614,18 +626,9 @@ export class Game {
     const a = this.ammo;
     a.pile = overflow ? a.pile + n : Math.min(a.cap, a.pile + n);
   }
-  /** Continuous weapons (beam, flame) burn one bullet per 1/ammoRate seconds of firing. */
-  feedContinuous(h, dt) {
-    if (h.ammoT > 0) { h.ammoT -= dt; h.dry = false; return true; }
-    if (this.takeAmmo(1) > 0) { h.dry = false; h.ammoT = 1 / (h.def.base.ammoRate || 1.25); this.ev('pull', { i: h.idx, n: 1 }); return true; }
-    this.ammo.waiting = true;
-    h.dry = true;
-    return false;
-  }
-
   updateHeroes(dt) {
     for (const h of this.heroes) {
-      if (h.disabled > 0) { h.beam = null; h.flameOn = false; continue; }
+      if (h.disabled > 0) { h.beam = null; h.flameOn = false; h.burstT = 0; continue; }
       const kind = h.def.kind;
       if (h.tgt && (h.tgt.dead || h.tgt.untargetable || dist(h.x, h.y, h.tgt.x, h.tgt.y) - h.tgt.r > this.heroRange(h))) h.tgt = null;
       h.cd -= dt;
@@ -639,7 +642,8 @@ export class Game {
           h.dry = got <= 0;
           if (got <= 0) { h.cd = 0.05; this.ammo.waiting = true; } // empty pile: wait for the revolver
           else {
-            h.cd += h.def.base.interval / this.heroRate(h);
+            const rl = this.reloadTime(h);
+            h.cd += rl; h.cdMax = rl;
             if (h.cd < 0) h.cd = 0;
             this.fire(h, t, got);
             this.ev('pull', { i: h.idx, n: got });
@@ -696,44 +700,73 @@ export class Game {
   }
 
   // Pulse: instant beam that hits everything along a line (GDD 5, "strong against aligned targets").
+  /**
+   * Beam and flame heroes fire in bursts: a shot pulls one bullet, then the weapon ticks every 0.1s for `burst`
+   * seconds, then reloads - the same reload cycle (and progress bar) as every other hero.
+   * Returns true when a burst has just begun.
+   */
+  startBurst(h) {
+    if (h.cd > 0) return false;
+    const t = this.acquire(h);
+    h.tgt = t;
+    if (!t) { h.cd = 0.05; h.dry = false; return false; }
+    if (this.takeAmmo(1) <= 0) { h.cd = 0.05; h.dry = true; this.ammo.waiting = true; return false; }
+    h.dry = false;
+    const rl = this.reloadTime(h);
+    h.cd += rl; h.cdMax = rl;
+    if (h.cd < 0) h.cd = 0;
+    h.burstT = h.def.base.burst;
+    h.tickCd = 0;
+    this.ev('pull', { i: h.idx, n: 1 });
+    return true;
+  }
+
+  // Pulse: instant beam that hits everything along a line (GDD 5, "strong against aligned targets").
   updateBeam(h, dt) {
-    const boost = h.beamBoost > 0;
+    const boost = h.beamBoost > 0; // Sustained Beam: continuous and free while it lasts
+    if (!boost) {
+      if (h.burstT <= 0 && !this.startBurst(h)) { h.beam = null; return; }
+      h.burstT -= dt;
+    }
     let t = h.tgt;
     if (!t || boost) t = this.acquire(h, boost ? 'toughest' : undefined);
     h.tgt = t;
-    if (!t || !this.feedContinuous(h, dt)) { h.beam = null; return; }
+    if (!t) { h.beam = null; if (!boost) h.burstT = 0; return; }
     const range = this.heroRange(h);
     const m = this.muzzle(h);
     const ang = Math.atan2(t.y - m.y, t.x - m.x);
     const ex = m.x + Math.cos(ang) * range, ey = m.y + Math.sin(ang) * range;
     const width = (boost ? 15 : 7) * (1 + this.mods.proj * 0.25);
     h.beam = { x1: m.x, y1: m.y, x2: ex, y2: ey, w: width, boost };
-    h.cd -= 0;
-    if (h.cd > 0) return;
-    h.cd = h.def.base.interval / this.heroRate(h);
+    h.tickCd -= dt;
+    if (h.tickCd > 0) return;
+    h.tickCd = TICK;
     const power = 1 + this.mods.abilityPower + h.rb.abilityPower;
-    const mult = boost ? 3 * power : 1;
+    const atk = boost ? h.cont * 3 * power : h.atk;
     const crit = this.rng.chance(h.def.base.crit + this.mods.crit);
     for (const e of this.enemies) {
       if (e.dead || e.untargetable) continue;
       if (pointSegDist2(e.x, e.y, m.x, m.y, ex, ey) > (e.r + width * 0.5) * (e.r + width * 0.5)) continue;
-      this.hit(h, e, h.atk * mult, { crit, critMult: h.def.base.critMult + this.mods.critMult, armorPierce: this.mods.armorPierce, el: 'energy', tick: true, x: e.x, y: e.y });
+      this.hit(h, e, atk, { crit, critMult: h.def.base.critMult + this.mods.critMult, armorPierce: this.mods.armorPierce, el: 'energy', tick: true, x: e.x, y: e.y });
     }
     this.ev('beamTick', { i: h.idx });
   }
 
   // Ember: short-range cone of fire that also ignites (GDD 5 roster).
   updateFlame(h, dt) {
+    if (h.burstT <= 0 && !this.startBurst(h)) { h.flameOn = false; return; }
+    h.burstT -= dt;
     const t = this.acquire(h) || null;
     h.tgt = t;
-    if (!t || !this.feedContinuous(h, dt)) { h.flameOn = false; return; }
+    if (!t) { h.flameOn = false; h.burstT = 0; return; }
     h.flameOn = true;
     const range = this.heroRange(h);
     const m = this.muzzle(h);
     h.flameAng = Math.atan2(t.y - m.y, t.x - m.x);
     h.flameRange = range;
-    if (h.cd > 0) return;
-    h.cd = h.def.base.interval / this.heroRate(h);
+    h.tickCd -= dt;
+    if (h.tickCd > 0) return;
+    h.tickCd = TICK;
     const crit = this.rng.chance(h.def.base.crit + this.mods.crit);
     const half = 0.42 + this.mods.proj * 0.1;
     for (const e of this.enemies) {
@@ -744,7 +777,7 @@ export class Game {
       let da = Math.atan2(dy, dx) - h.flameAng;
       da = Math.atan2(Math.sin(da), Math.cos(da));
       if (Math.abs(da) > half + Math.atan2(e.r, Math.max(d, 1))) continue;
-      this.hit(h, e, h.atk, { crit, critMult: h.def.base.critMult + this.mods.critMult, armorPierce: this.mods.armorPierce, el: 'fire', tick: true, x: e.x, y: e.y, burn: h.atk * 1.4 * (1 + h.rb.passive * 0.0) });
+      this.hit(h, e, h.atk, { crit, critMult: h.def.base.critMult + this.mods.critMult, armorPierce: this.mods.armorPierce, el: 'fire', tick: true, x: e.x, y: e.y, burn: h.cont * 1.6 });
     }
   }
 
@@ -1018,7 +1051,7 @@ export class Game {
       if (c > bc) { bc = c; best = e; }
     }
     const x = best ? best.x : W / 2, y = best ? best.y : this.wallY - 140;
-    this.zones.push({ x, y, r: 74 + this.mods.abilityTargets * 4, t: dur, tick: 0, dps: h.atk * 14 * power, src: h });
+    this.zones.push({ x, y, r: 74 + this.mods.abilityTargets * 4, t: dur, tick: 0, dps: h.cont * 15 * power, src: h });
   }
 
   autoAbilities() {

@@ -98,9 +98,9 @@ export const BOSSES = {
 /** Stage index -> multipliers (GDD 6: Health(stage) = Base * (1 + alpha * stage)). */
 /** Balance knobs - tools/balance.mjs sweeps these. */
 export const TUNE = {
-  alphaHp: 0.9, alphaDmg: 0.3, waveHp: 0.05, bossHp: 0.45,
+  alphaHp: 0.9, alphaDmg: 0.3, waveHp: 0.05, bossHp: 0.36,
   // Wave pressure = (expected solo damage output) x (round curve) x (stage pressure). See buildWaves().
-  pressure: 1, pressureIdx: 0.07, curve: [0.35, 1.2, 3.2],
+  pressure: 0.72, pressureIdx: 0.2, earlyEase: 0.3, curve: [0.35, 1.2, 3.2],
 };
 export function statScale(stageIdx, waveIdx = 0, hard = false) {
   const hp = (1 + TUNE.alphaHp * stageIdx) * (1 + TUNE.waveHp * waveIdx) * (hard ? 2.1 : 1);
@@ -112,5 +112,5 @@ export const MODIFIERS = {
   swift: { name: 'Swift Foes', desc: 'Enemies move 20% faster.', icon: '»', speed: 1.2 },
   hardened: { name: 'Hardened Hides', desc: 'Enemies gain extra armor.', icon: '▣', armorAdd: 0.15 },
   swarm: { name: 'Swarm Tide', desc: '30% more enemies, each with less health.', icon: '∷', count: 1.3, hp: 0.8 },
-  regen: { name: 'Regeneration', desc: 'Enemies slowly heal over time.', icon: '+', regen: 0.012 },
+  regen: { name: 'Regeneration', desc: 'Enemies slowly heal over time.', icon: '+', regen: 0.008 },
 };
