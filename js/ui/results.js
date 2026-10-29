@@ -3,7 +3,7 @@
 import { h } from './dom.js';
 import { icon } from './icons.js';
 import { registerScreen, go, sfx, topBar } from './app.js';
-import { startCombat } from './combat.js';
+import { startWithLeadPick } from './lead.js';
 import { STAGE_BY_ID, STAGES } from '../data/stages.js';
 import { HEROES } from '../data/heroes.js';
 import { fmtFull } from '../util.js';
@@ -45,10 +45,10 @@ registerScreen('results', ({ result, reward, stageId, hard, survival }) => {
       h('div', { class: 'stat-line' }, h('span', null, 'Time'), h('b', null, `${Math.floor(result.time / 60)}:${String(Math.floor(result.time % 60)).padStart(2, '0')}`))),
     h('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' } },
       next && isStageUnlocked(p, next)
-        ? h('button', { class: 'btn primary big block', onclick: () => startCombat({ stageId: next.id }) }, `Next: ${next.id}`)
+        ? h('button', { class: 'btn primary big block', onclick: () => startWithLeadPick({ stageId: next.id }) }, `Next: ${next.id}`)
         : null,
       h('div', { class: 'row' },
-        h('button', { class: 'btn grow', onclick: () => startCombat(survival ? { survival: true } : { stageId, hard }) }, 'Retry'),
+        h('button', { class: 'btn grow', onclick: () => startWithLeadPick(survival ? { survival: true } : { stageId, hard }) }, 'Retry'),
         h('button', { class: 'btn grow', onclick: () => go('home') }, 'Home'))));
   audio.playMusic('menu');
   return { el: h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } }, topBar(p), el) };

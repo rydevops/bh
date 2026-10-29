@@ -59,7 +59,7 @@ const path = require('path');
   const e0 = await edge();
   if (e0.pos === 'fixed' && e0.pe === 'none' && e0.w === e0.vw) ok('solid status-bar strip (#edge) exists: fixed, full width, never intercepts touches'); else fail('#edge wrong: ' + JSON.stringify(e0));
   if (e0.bg === 'rgb(8, 12, 28)') ok('on menu screens the strip is the flat app colour'); else fail('menu strip colour ' + e0.bg);
-  await p.click('.nav >> text=Battle'); await p.click('button:has-text("Battle")'); await p.waitForSelector('.ab'); await p.waitForTimeout(1300);
+  await p.click('.nav >> text=Battle'); await p.click('button:has-text("Battle")'); await p.click('.sheet button.primary:has-text("Start")'); await p.waitForSelector('.ab'); await p.waitForTimeout(1300);
   const e1 = await edge();
   if (e1.bg === 'rgb(106, 90, 168)') ok('in combat the strip matches the top row of the world sky (' + e1.bg + ')'); else fail('combat strip colour ' + e1.bg);
   await p.click('[aria-label="Pause"]'); await p.click('button:has-text("Quit")'); await p.locator('.sheet button:has-text("Quit")').last().click(); await p.waitForSelector('.res-title');
