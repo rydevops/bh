@@ -1,5 +1,7 @@
-// Browser test: (1) a new game starts a battle with ONE hero, the others arrive via summon reward cards;
-// (2) Settings is reachable from every main screen; (3) "Reset all progress" really starts over.
+// Browser test of the battle rules and settings:
+//  - a new game starts a battle with ONE hero and 2x speed is locked until the stage is cleared
+//  - once cleared, 2x works; extra heroes arrive via random summon cards (never two reward rounds in a row without one)
+//  - Settings is reachable from every main screen; "Reset all progress" really starts over
 //   node tools/e2e/summon-reset.cjs
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
@@ -17,54 +19,71 @@ const path = require('path');
   p.on('pageerror', (e) => fail('pageerror: ' + e.message));
   p.on('console', (m) => { if (m.type() === 'error') fail('console error: ' + m.text()); });
   const save = () => p.evaluate(() => JSON.parse(JSON.parse(localStorage.getItem('bullet-heroes.save')).d));
+  const startFromSplash = async () => { await p.waitForSelector('text=Tap to play'); await p.click('text=Tap to play'); };
 
+  // ---- 1. brand-new game: one hero, 2x locked
   await p.goto('http://localhost:8093/');
-  await p.waitForSelector('text=Tap to play');
-  await p.click('text=Tap to play');
+  await startFromSplash();
   await p.waitForSelector('.ab');
-
-  // ---- 1. one hero at the start
   const total = await p.locator('.ab').count();
   const locked = await p.locator('.ab.locked').count();
-  if (total === 3 && locked === 2) ok(`new battle starts with 1 hero deployed (${total - locked}/${total}); the other ${locked} are locked`); else fail(`expected 3 slots / 2 locked, got ${total}/${locked}`);
+  if (total === 3 && locked === 2) ok(`new battle starts with 1 hero deployed (${total - locked}/${total})`); else fail(`expected 3 slots / 2 locked, got ${total}/${locked}`);
+  const speedLabel = await p.getAttribute('.hud-top .hud-btn:last-child', 'aria-label');
+  if (/locked/i.test(speedLabel)) ok('2x speed is locked on an uncleared stage'); else fail('speed button not locked: ' + speedLabel);
+  await p.click('.hud-top .hud-btn:last-child');
+  if (await p.locator('.toast', { hasText: 'unlock 2' }).count()) ok('tapping it explains how to unlock'); else fail('no unlock explanation toast');
 
-  // ---- summon via reward cards
-  await p.click('[aria-label="Combat speed"]');
-  const joined = [];
-  for (let i = 0; i < 2; i++) {
-    await p.waitForSelector('.overlay.on .upg', { timeout: 120000 });
-    const cards = await p.locator('.overlay.on .upg').count();
-    const first = await p.locator('.overlay.on .upg').first();
-    const label = await first.getAttribute('aria-label');
-    if (!/^Summon /.test(label || '')) fail('first card is not a summon card: ' + label); else joined.push(label);
-    if (cards !== 3) fail('expected 3 cards, got ' + cards);
+  // ---- 2. clear 1-1 (seeded), then 2x is available and summons are random-with-pity
+  await p.click('[aria-label="Pause"]'); await p.click('button:has-text("Quit")'); await p.locator('.sheet button:has-text("Quit")').last().click();
+  await p.waitForSelector('.res-title');
+  await p.evaluate(async () => {
+    const { store } = await import('/js/store.js');
+    store.update((pr) => { pr.stages['1-1'] = { stars: 3, hard: false, hardStars: 0 }; pr.flags.heroMenu = true; });
+  });
+  await p.click('text=Home'); await p.click('button:has-text("Battle")');
+  await p.waitForSelector('.ab');
+  const label2 = await p.getAttribute('.hud-top .hud-btn:last-child', 'aria-label');
+  // Battle now launches 1-2, which is NOT cleared yet: the unlock is per stage, so 2x must still be locked here.
+  if (/locked/i.test(label2)) ok('2x is per stage: clearing 1-1 does not unlock it on 1-2'); else fail('2x unlocked on an uncleared stage: ' + label2);
+  // Now mark 1-2 cleared as well
+  await p.evaluate(async () => { const { store } = await import('/js/store.js'); store.update((pr) => { pr.stages['1-2'] = { stars: 3, hard: false, hardStars: 0 }; }); });
+  await p.click('[aria-label="Pause"]'); await p.click('button:has-text("Quit")'); await p.locator('.sheet button:has-text("Quit")').last().click();
+  await p.waitForSelector('.res-title'); await p.click('text=Home');
+  await p.evaluate(async () => { const { store } = await import('/js/store.js'); store.update((pr) => { pr.flags.lastStage = '1-2'; }); });
+  await p.reload(); await startFromSplash(); await p.waitForSelector('.nav');
+  await p.click('button:has-text("Battle")'); await p.waitForSelector('.ab');
+  await p.click('.hud-top .hud-btn:last-child');
+  const sp = (await p.textContent('.hud-top .hud-btn:last-child')).trim();
+  if (sp === '2×') ok('2x speed toggles on a cleared stage'); else fail('speed button shows ' + sp);
+
+  let misses = 0, joined = 0, rounds = 0;
+  while (joined < 2 && rounds < 6) {
+    await p.waitForSelector('.overlay.on .upg', { timeout: 150000 });
+    rounds++;
+    const first = p.locator('.overlay.on .upg').first();
+    const isSummon = /^Summon /.test((await first.getAttribute('aria-label')) || '');
+    if (isSummon) { joined++; misses = 0; } else { misses++; }
+    if (misses > 1) fail('two reward rounds in a row without a hero card');
     await first.click();
-    await p.waitForSelector('.overlay.on', { state: 'detached', timeout: 5000 }).catch(() => {});
-    await p.waitForTimeout(300);
-    const nowLocked = await p.locator('.ab.locked').count();
-    if (nowLocked !== 1 - i) fail(`after summon #${i + 1} expected ${1 - i} locked slots, got ${nowLocked}`);
+    await p.waitForTimeout(400);
   }
-  ok('summoned via reward cards: ' + joined.join(', '));
-  await p.waitForSelector('.res-title', { timeout: 150000 });
-  ok('stage cleared with the assembled squad');
-  const afterWin = await save();
-  if (afterWin.stages['1-1'] && afterWin.coins > 0) ok(`progress saved (coins ${afterWin.coins})`); else fail('win not saved');
+  const nowLocked = await p.locator('.ab.locked').count();
+  if (joined === 2 && nowLocked === 0) ok(`both reserve heroes arrived through summon cards within ${rounds} reward rounds`); else fail(`joined=${joined} locked=${nowLocked} rounds=${rounds}`);
 
-  // ---- 2. settings gear on every main screen
-  await p.click('text=Home');
-  for (const [tab, name] of [['Home', 'Battle'], ['Heroes', 'Heroes'], ['Research', 'Research'], ['Missions', 'Missions'], ['Wardrobe', 'Wardrobe']]) {
-    await p.click(`.nav >> text=${tab === 'Home' ? 'Battle' : tab}`);
+  // ---- 3. settings gear on every main screen
+  await p.click('[aria-label="Pause"]'); await p.click('button:has-text("Quit")'); await p.locator('.sheet button:has-text("Quit")').last().click();
+  await p.waitForSelector('.res-title'); await p.click('text=Home');
+  for (const [tab, name] of [['Battle', 'Battle'], ['Heroes', 'Heroes'], ['Research', 'Research'], ['Missions', 'Missions'], ['Wardrobe', 'Wardrobe']]) {
+    await p.click(`.nav >> text=${tab}`);
     await p.waitForTimeout(250);
-    const n = await p.locator('[aria-label="Settings"]').count();
-    if (n >= 1) ok(`Settings button on ${name}`); else fail(`no Settings button on ${name}`);
+    if (await p.locator('[aria-label="Settings"]').count()) ok(`Settings button on ${name}`); else fail(`no Settings button on ${name}`);
   }
   await p.click('.nav >> text=Battle');
-  await p.click('text=Stages');
+  await p.click('button:has-text("Stages")');
   if (await p.locator('[aria-label="Settings"]').count()) ok('Settings button on Stages'); else fail('no Settings on Stages');
   await p.click('[aria-label="Back"]');
 
-  // ---- 3. reset all progress
-  await p.evaluate(() => { document.querySelector('.scroll').scrollTop = 0; });
+  // ---- 4. reset all progress
   await p.click('[aria-label="Settings"]');
   await p.locator('[aria-label="Reset all progress"]').scrollIntoViewIfNeeded();
   await p.click('[aria-label="Reset all progress"]');
@@ -76,10 +95,9 @@ const path = require('path');
   else fail('reset left progress behind: ' + JSON.stringify({ stages: after.stages, coins: after.coins }));
   await p.click('text=Tap to play');
   await p.waitForSelector('.ab');
-  const lockedAfter = await p.locator('.ab.locked').count();
-  if (lockedAfter === 2) ok('after reset a brand-new game starts with one hero again'); else fail('new game after reset not fresh: locked=' + lockedAfter);
+  if ((await p.locator('.ab.locked').count()) === 2) ok('after reset a brand-new game starts with one hero again'); else fail('new game after reset not fresh');
 
   await browser.close();
   srv.kill();
-  console.log(bad.length ? `\n${bad.length} CHECK(S) FAILED` : '\nSUMMON + SETTINGS + RESET: ALL CHECKS PASSED');
+  console.log(bad.length ? `\n${bad.length} CHECK(S) FAILED` : '\nBATTLE RULES + SETTINGS + RESET: ALL CHECKS PASSED');
 })().catch((e) => { console.error(e); process.exit(1); });

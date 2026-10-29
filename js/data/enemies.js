@@ -97,7 +97,11 @@ export const BOSSES = {
 
 /** Stage index -> multipliers (GDD 6: Health(stage) = Base * (1 + alpha * stage)). */
 /** Balance knobs - tools/balance.mjs sweeps these. */
-export const TUNE = { alphaHp: 0.9, alphaDmg: 0.3, waveHp: 0.05, budgetBase: 5.5, budgetIdx: 3.0, waveGrow: 0.4, bossHp: 0.45 };
+export const TUNE = {
+  alphaHp: 0.9, alphaDmg: 0.3, waveHp: 0.05, bossHp: 0.45,
+  // Wave pressure = (expected solo damage output) x (round curve) x (stage pressure). See buildWaves().
+  pressure: 1, pressureIdx: 0.07, curve: [0.35, 1.2, 3.2],
+};
 export function statScale(stageIdx, waveIdx = 0, hard = false) {
   const hp = (1 + TUNE.alphaHp * stageIdx) * (1 + TUNE.waveHp * waveIdx) * (hard ? 2.1 : 1);
   const dmg = (1 + TUNE.alphaDmg * stageIdx) * (hard ? 1.5 : 1);

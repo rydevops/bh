@@ -14,6 +14,8 @@ import { spawnBoss, updateBoss, bossDamageHook, killAllMinions } from './bosses.
 
 export const W = 360;
 const STEP_MAX = 1 / 30;
+/** Chance that a post-wave reward round offers a new hero (guaranteed after one miss). */
+export const SUMMON_CHANCE = 0.5;
 
 export class Game {
   /**
@@ -73,6 +75,15 @@ export class Game {
 
     // Cut energy for bullet cutting (GDD 4.4)
     this.cut = { energy: 100, max: 100 };
+
+    // Revolver ammo economy: the slicer cuts bullets from the cylinder into a pile; heroes draw from the pile.
+    // Base output (1 bullet / 0.36s) exactly feeds one rifle; upgrades raise it to 6 per cycle.
+    this.ammo = {
+      pile: 6, cap0: 12, cap: 12, t: 0, cycleBase: 0.36, cycle: 0.36, perCycle: 1,
+      made: 0, taken: 0, waiting: false, starve: 0, sliceFlash: 0, rotN: 0,
+    };
+    this.summonMissed = 0;
+    this.summonOffer = false;
 
     // Heroes
     // Each battle deploys only the lead hero; the rest of the squad waits in `reserve` and is
@@ -140,6 +151,10 @@ export class Game {
     this.base.max = newMax;
     if (delta > 0) this.base.hp += delta;
     this.cut.max = 100 * (1 + this.mods.cut + this.bonus.cut);
+    const am = this.ammo;
+    am.perCycle = Math.min(6, 1 + this.mods.slicer);
+    am.cycle = am.cycleBase * (1 - Math.min(0.6, this.mods.cycle));
+    am.cap = am.cap0 + this.mods.pile;
     if (initial) this.cut.energy = this.cut.max;
     // Turrets (GDD 7.2): flank positions on the wall.
     const want = Math.min(2, this.mods.turrets);
@@ -222,6 +237,7 @@ export class Game {
     if (this.bannerT > 0) this.bannerT -= dt;
     this.updateSpawns();
     this.updateStatus(dt);
+    this.updateAmmo(dt);
     this.updateEnemies(dt);
     this.updateHeroes(dt);
     this.updateTurrets(dt);
@@ -271,16 +287,20 @@ export class Game {
   // ------------------------------------------------------------------ upgrades
   openUpgrade() {
     this.state = 'upgrade';
+    // Extra heroes are a random reward: SUMMON_CHANCE per checkpoint, but never two checkpoints in a row without one.
+    this.summonOffer = this.reserve.length > 0 && (this.summonMissed >= 1 || this.rng.chance(SUMMON_CHANCE));
+    this.summonMissed = this.summonOffer ? 0 : this.summonMissed + 1;
     this.choices = this.rollChoices();
     this.ev('upgradeOpen', {});
   }
   squadTags() { const s = new Set(); for (const h of this.allHeroes) for (const t of h.def.tags) s.add(t); return s; }
   rollChoices(exclude = []) {
-    const summon = this.reserve.length > 0; // a hero reward is always on offer until the squad is complete
+    const summon = this.summonOffer && this.reserve.length > 0;
     const picks = rollUpgrades(this.rng, {
       owned: this.owned, squadTags: this.squadTags(),
       enemyTags: new Set(this.stage ? this.stage.tags : ['swarm', 'armored', 'ranged']),
       wave: Math.max(0, this.waveIdx), baseFrac: this.base.hp / this.base.max, n: summon ? 2 : 3, exclude,
+      ammoPressure: this.ammo.starve,
     });
     return summon ? ['summon:' + this.reserve[0].id, ...picks] : picks;
   }
@@ -326,7 +346,7 @@ export class Game {
       wave: nextWave, owned: { ...this.owned }, baseFrac: this.base.hp / this.base.max,
       rerolls: this.rerolls, stats: { ...this.stats }, seed: (this.opts.seed ?? 1) + nextWave * 7919,
       squad: this.opts.squad.map((s) => ({ ...s })),
-      deployed: this.heroes.map((h) => h.idx),
+      deployed: this.heroes.map((h) => h.idx), missed: this.summonMissed,
     };
   }
   checkpoint(nextWave) { this.ev('checkpoint', { snap: this.snapshot(nextWave) }); }
@@ -335,6 +355,7 @@ export class Game {
     this.stats = { ...this.stats, ...cp.stats };
     this.rerolls = cp.rerolls;
     this.pendingPicks = 0;
+    this.summonMissed = cp.missed ?? 0;
     if (cp.deployed) {
       const set = new Set(cp.deployed);
       this.heroes = this.allHeroes.filter((h) => set.has(h.idx));
@@ -568,6 +589,40 @@ export class Game {
     return best || fb;
   }
 
+  // ------------------------------------------------------------------ revolver ammo
+  updateAmmo(dt) {
+    const a = this.ammo;
+    if (a.sliceFlash > 0) a.sliceFlash -= dt;
+    a.t += dt;
+    if (a.t >= a.cycle) {
+      const n = Math.min(a.perCycle, Math.floor(a.cap - a.pile));
+      if (n > 0) { a.t -= a.cycle; a.pile += n; a.made += n; a.rotN++; a.sliceFlash = 0.18; this.ev('slice', { n }); }
+      else a.t = a.cycle; // pile full: the slicer waits with the cut ready
+    }
+    // How long recently was a hero waiting on the revolver? Drives the "feed the squad" upgrade weighting.
+    a.starve += ((a.waiting ? 1 : 0) - a.starve) * Math.min(1, dt / 3);
+    a.waiting = false;
+  }
+  /** Heroes pull bullets from the pile. Returns how many they actually got (0 = wait for the slicer). */
+  takeAmmo(n) {
+    const a = this.ammo;
+    const got = Math.min(n, Math.floor(a.pile));
+    a.pile -= got; a.taken += got;
+    return got;
+  }
+  addAmmo(n, overflow = false) {
+    const a = this.ammo;
+    a.pile = overflow ? a.pile + n : Math.min(a.cap, a.pile + n);
+  }
+  /** Continuous weapons (beam, flame) burn one bullet per 1/ammoRate seconds of firing. */
+  feedContinuous(h, dt) {
+    if (h.ammoT > 0) { h.ammoT -= dt; h.dry = false; return true; }
+    if (this.takeAmmo(1) > 0) { h.dry = false; h.ammoT = 1 / (h.def.base.ammoRate || 1.25); this.ev('pull', { i: h.idx, n: 1 }); return true; }
+    this.ammo.waiting = true;
+    h.dry = true;
+    return false;
+  }
+
   updateHeroes(dt) {
     for (const h of this.heroes) {
       if (h.disabled > 0) { h.beam = null; h.flameOn = false; continue; }
@@ -580,9 +635,15 @@ export class Game {
         const t = this.acquire(h);
         h.tgt = t;
         if (t) {
-          h.cd += h.def.base.interval / this.heroRate(h);
-          if (h.cd < 0) h.cd = 0;
-          this.fire(h, t);
+          const got = this.takeAmmo(1 + this.mods.proj);
+          h.dry = got <= 0;
+          if (got <= 0) { h.cd = 0.05; this.ammo.waiting = true; } // empty pile: wait for the revolver
+          else {
+            h.cd += h.def.base.interval / this.heroRate(h);
+            if (h.cd < 0) h.cd = 0;
+            this.fire(h, t, got);
+            this.ev('pull', { i: h.idx, n: got });
+          }
         } else h.cd = 0.05;
       }
       if (h.id === 'patch') this.updateTriage(h, dt);
@@ -594,14 +655,13 @@ export class Game {
     return { x: h.x, y: h.y - 22 };
   }
 
-  fire(h, t) {
+  fire(h, t, n = 1) {
     const base = h.def.base;
     const m = this.muzzle(h);
     const speed = base.speed * (1 + this.mods.speed);
     const tt = Math.max(0.02, dist(m.x, m.y, t.x, t.y) / speed);
     const px = t.x + t.vx * tt, py = t.y + t.vy * tt;
     const a0 = Math.atan2(py - m.y, px - m.x);
-    const n = 1 + this.mods.proj;
     const crit = h.deadEyeT > 0 || this.rng.chance(base.crit + this.mods.crit);
     for (let i = 0; i < n; i++) {
       const off = (i - (n - 1) / 2) * 0.13;
@@ -609,7 +669,7 @@ export class Game {
       const b = this.bullets.spawn();
       b.x = m.x; b.y = m.y; b.vx = Math.cos(a) * speed; b.vy = Math.sin(a) * speed;
       b.src = h; b.kind = h.def.kind; b.r = h.def.kind === 'rocket' ? 5 : h.def.kind === 'sniper' ? 3.5 : 3;
-      b.attack = h.atk * (i === 0 ? 1 : 0.6);
+      b.attack = h.atk * (i === 0 ? 1 : 0.75);
       b.crit = i === 0 ? crit : this.rng.chance(base.crit + this.mods.crit);
       b.critMult = base.critMult + this.mods.critMult;
       b.pierce = base.pierce + this.mods.pierce + h.rb.pierce;
@@ -641,7 +701,7 @@ export class Game {
     let t = h.tgt;
     if (!t || boost) t = this.acquire(h, boost ? 'toughest' : undefined);
     h.tgt = t;
-    if (!t) { h.beam = null; return; }
+    if (!t || !this.feedContinuous(h, dt)) { h.beam = null; return; }
     const range = this.heroRange(h);
     const m = this.muzzle(h);
     const ang = Math.atan2(t.y - m.y, t.x - m.x);
@@ -666,7 +726,7 @@ export class Game {
   updateFlame(h, dt) {
     const t = this.acquire(h) || null;
     h.tgt = t;
-    if (!t) { h.flameOn = false; return; }
+    if (!t || !this.feedContinuous(h, dt)) { h.flameOn = false; return; }
     h.flameOn = true;
     const range = this.heroRange(h);
     const m = this.muzzle(h);
@@ -887,6 +947,8 @@ export class Game {
       if (b.cutHp <= 0) {
         b.dead = true; n++;
         this.stats.cuts++;
+        this.addAmmo(b.kind === 'bomb' ? 2 : 1);
+        this.ev('recycle', { x: b.x, y: b.y });
         // Reward the skill: each severed bullet charges abilities slightly.
         for (const h of this.heroes) if (h.ab.cd > 0) h.ab.cd = Math.max(0, h.ab.cd - 0.35);
         if (b.kind === 'bomb') this.ev('explosion', { x: b.x, y: b.y, r: 36, big: false });
@@ -908,6 +970,7 @@ export class Game {
     h.ab.activeMax = dur;
     this.stats.abilities++;
     if (id === 'vanguard') {
+      this.addAmmo(6); // Overdrive also loads the pile
       h.buff.rate = 1 + 1 * power; h.buff.rateT = dur;
       this.squadBuff.mult = 1 + 0.25 * power; this.squadBuff.t = dur;
     } else if (id === 'rook') {

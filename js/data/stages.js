@@ -1,7 +1,8 @@
 // Data-driven campaign (GDD section 9). Designers configure stages here:
 // spawn schedules (explicit `waves`, or generated from `pool`), modifiers, bosses, rewards.
 
-import { ENEMIES, TUNE } from './enemies.js';
+import { ENEMIES, TUNE, statScale } from './enemies.js';
+import { heroDps, expectedLevel, expectedRank } from '../progression.js';
 
 export const WORLDS = [
   {
@@ -21,45 +22,59 @@ export const WORLDS = [
   },
 ];
 
-// pool entries: e = enemy id, from = first wave index it can appear in, w = relative share.
+/** Every stage is 12 rounds long. */
+export const WAVES_PER_STAGE = 12;
+
+/**
+ * Round difficulty across a stage, as a multiple of what ONE expected hero can kill in the round's time window:
+ * a gentle opening for the lone starting hero, then a steady climb as reinforcements and upgrades arrive. Hero reinforcements arrive randomly but never more
+ * than one checkpoint apart, so the curve never outruns the squad for long.
+ */
+export const waveCurve = (k) => {
+  const x = k / (WAVES_PER_STAGE - 1);
+  const [a, b, c] = TUNE.curve;
+  return a + b * x + c * x * x;
+};
+
+// pool entries: e = enemy id, from = first *intro tier* it appears in (scaled onto the 12 rounds), w = relative share.
 const STAGE_DEFS = [
   // ---- World 1 ----
-  { id: '1-1', name: 'Dusty Outskirts', world: 0, waveCount: 3, pool: [{ e: 'grunt', from: 0, w: 1 }],
+  { id: '1-1', name: 'Dusty Outskirts', world: 0, waveCount: WAVES_PER_STAGE, pool: [{ e: 'grunt', from: 0, w: 1 }],
     coins: 40, gems: 5, frag: [{ hero: 'pulse', n: 3 }] },
-  { id: '1-2', name: 'Broken Highway', world: 0, waveCount: 4, pool: [{ e: 'grunt', from: 0, w: 3 }, { e: 'runner', from: 1, w: 2 }],
+  { id: '1-2', name: 'Broken Highway', world: 0, waveCount: WAVES_PER_STAGE, pool: [{ e: 'grunt', from: 0, w: 3 }, { e: 'runner', from: 1, w: 2 }],
     coins: 60, gems: 6, frag: [{ hero: 'pulse', n: 4 }] },
-  { id: '1-3', name: 'Scrapyard Siege', world: 0, waveCount: 4, mod: 'swift',
+  { id: '1-3', name: 'Scrapyard Siege', world: 0, waveCount: WAVES_PER_STAGE, mod: 'swift',
     pool: [{ e: 'grunt', from: 0, w: 3 }, { e: 'runner', from: 0, w: 2 }, { e: 'bulwark', from: 1, w: 2 }],
     coins: 85, gems: 7, frag: [{ hero: 'pulse', n: 4 }, { hero: 'specter', n: 2 }] },
-  { id: '1-4', name: 'The Siege Colossus', world: 0, waveCount: 4, boss: 'colossus',
+  { id: '1-4', name: 'The Siege Colossus', world: 0, waveCount: WAVES_PER_STAGE, boss: 'colossus',
     pool: [{ e: 'grunt', from: 0, w: 3 }, { e: 'runner', from: 0, w: 2 }, { e: 'bulwark', from: 2, w: 1 }],
     coins: 140, gems: 15, tokens: 3, frag: [{ hero: 'specter', n: 6 }, { hero: 'rook', n: 3 }] },
 
   // ---- World 2 ----
-  { id: '2-1', name: 'Docking Ring', world: 1, waveCount: 4,
+  { id: '2-1', name: 'Docking Ring', world: 1, waveCount: WAVES_PER_STAGE,
     pool: [{ e: 'grunt', from: 0, w: 3 }, { e: 'runner', from: 0, w: 2 }, { e: 'drone', from: 1, w: 2 }],
     coins: 110, gems: 8, frag: [{ hero: 'specter', n: 4 }, { hero: 'ember', n: 3 }, { hero: 'vanguard', n: 3 }] },
-  { id: '2-2', name: 'Shield Array', world: 1, waveCount: 5, mod: 'hardened',
+  { id: '2-2', name: 'Shield Array', world: 1, waveCount: WAVES_PER_STAGE, mod: 'hardened',
     pool: [{ e: 'grunt', from: 0, w: 2 }, { e: 'drone', from: 0, w: 2 }, { e: 'sentinel', from: 1, w: 2 }, { e: 'spitter', from: 2, w: 2 }],
     coins: 135, gems: 9, frag: [{ hero: 'ember', n: 4 }, { hero: 'patch', n: 3 }] },
-  { id: '2-3', name: 'Alien Hive Deck', world: 1, waveCount: 5, mod: 'swarm',
+  { id: '2-3', name: 'Alien Hive Deck', world: 1, waveCount: WAVES_PER_STAGE, mod: 'swarm',
     pool: [{ e: 'runner', from: 0, w: 3 }, { e: 'grunt', from: 0, w: 2 }, { e: 'bulwark', from: 1, w: 1 }, { e: 'drone', from: 2, w: 2 }, { e: 'sentinel', from: 3, w: 1 }],
     coins: 165, gems: 10, frag: [{ hero: 'ember', n: 5 }, { hero: 'specter', n: 4 }] },
-  { id: '2-4', name: 'The Void Leviathan', world: 1, waveCount: 5, boss: 'leviathan',
+  { id: '2-4', name: 'The Void Leviathan', world: 1, waveCount: WAVES_PER_STAGE, boss: 'leviathan',
     pool: [{ e: 'drone', from: 0, w: 3 }, { e: 'runner', from: 0, w: 2 }, { e: 'sentinel', from: 2, w: 1 }, { e: 'spitter', from: 1, w: 1 }],
     coins: 240, gems: 20, tokens: 3, frag: [{ hero: 'ember', n: 6 }, { hero: 'pulse', n: 4 }] },
 
   // ---- World 3 ----
-  { id: '3-1', name: 'Slime Caverns', world: 2, waveCount: 5,
+  { id: '3-1', name: 'Slime Caverns', world: 2, waveCount: WAVES_PER_STAGE,
     pool: [{ e: 'grunt', from: 0, w: 3 }, { e: 'splitter', from: 0, w: 2 }, { e: 'slimeling', from: 2, w: 2 }, { e: 'spitter', from: 3, w: 1 }],
     coins: 195, gems: 10, frag: [{ hero: 'ember', n: 4 }, { hero: 'rook', n: 3 }] },
-  { id: '3-2', name: 'Mutant Gardens', world: 2, waveCount: 5, mod: 'regen',
+  { id: '3-2', name: 'Mutant Gardens', world: 2, waveCount: WAVES_PER_STAGE, mod: 'regen',
     pool: [{ e: 'splitter', from: 0, w: 3 }, { e: 'bulwark', from: 1, w: 2 }, { e: 'sentinel', from: 1, w: 1 }, { e: 'spitter', from: 1, w: 2 }, { e: 'runner', from: 2, w: 2 }],
     coins: 225, gems: 11, frag: [{ hero: 'specter', n: 5 }, { hero: 'vanguard', n: 4 }] },
-  { id: '3-3', name: 'Pulsing Nest', world: 2, waveCount: 6, mod: 'swarm',
+  { id: '3-3', name: 'Pulsing Nest', world: 2, waveCount: WAVES_PER_STAGE, mod: 'swarm',
     pool: [{ e: 'slimeling', from: 0, w: 3 }, { e: 'splitter', from: 0, w: 2 }, { e: 'runner', from: 1, w: 2 }, { e: 'drone', from: 2, w: 2 }, { e: 'bulwark', from: 2, w: 1 }, { e: 'sentinel', from: 3, w: 1 }],
     coins: 260, gems: 12, frag: [{ hero: 'pulse', n: 5 }, { hero: 'patch', n: 4 }, { hero: 'ember', n: 3 }] },
-  { id: '3-4', name: 'The Brood Mother', world: 2, waveCount: 5, boss: 'broodmother',
+  { id: '3-4', name: 'The Brood Mother', world: 2, waveCount: WAVES_PER_STAGE, boss: 'broodmother',
     pool: [{ e: 'splitter', from: 0, w: 2 }, { e: 'slimeling', from: 0, w: 3 }, { e: 'spitter', from: 1, w: 2 }, { e: 'bulwark', from: 2, w: 1 }],
     coins: 380, gems: 30, tokens: 4, frag: [{ hero: 'specter', n: 8 }, { hero: 'ember', n: 8 }] },
 ];
@@ -85,15 +100,9 @@ export const MILESTONES = {
   hard: { stage: '3-4', label: 'Hard difficulty' },
 };
 
-/**
- * Squads now assemble one hero per wave (summon rewards), so early waves are scaled to the reinforcements
- * that will actually be on the field: wave 1 = lead hero only, wave 2 = two heroes, etc.
- */
-export const REINFORCE_RAMP = [0.35, 0.6, 0.8, 0.95];
-const ramp = (k) => REINFORCE_RAMP[k] ?? 1;
-
 /** "Cost" in grunt-equivalents - heavier enemies appear in smaller numbers. */
-const COST = { grunt: 1, runner: 0.8, bulwark: 4, sentinel: 3, spitter: 2, drone: 2, splitter: 3, slimeling: 0.5 };
+// Effective durability relative to a grunt, counting armor, shields and what an enemy spawns when it dies.
+const COST = { grunt: 1, runner: 0.8, bulwark: 9, sentinel: 4.5, spitter: 2, drone: 2.5, splitter: 4.5, slimeling: 0.5 };
 
 /**
  * Build the spawn schedule for a stage. Returns an array of waves; each wave is a list of groups:
@@ -107,13 +116,21 @@ export function buildWaves(stage, { hard = false } = {}) {
   for (let k = 0; k < stage.waveCount; k++) {
     const last = k === stage.waveCount - 1;
     const groups = [];
-    const budget = (TUNE.budgetBase + stage.idx * TUNE.budgetIdx) * (1 + TUNE.waveGrow * k) * ramp(k) * swarm * (hard ? 1.15 : 1) * (last && stage.boss ? 0.6 : 1);
-    const avail = stage.pool.filter((p) => p.from <= k);
+    const span = 10 + k * 1.2;
+    // Budget in "plain grunts": the hit points a typical player's lone hero can chew through in `span` seconds,
+    // scaled by the round curve, then divided by how tough this stage's enemies are. Counts therefore stay sane even
+    // when enemy health scales steeply, and difficulty rises smoothly from round to round and stage to stage.
+    const solo = heroDps('vanguard', expectedLevel(stage.idx), expectedRank(stage.idx));
+    const hpMul = statScale(stage.idx, k, hard).hp * (stage.mod === 'swarm' ? 0.8 : 1);
+    const pressure = TUNE.pressure * (1 + TUNE.pressureIdx * stage.idx);
+    const budget = ((solo * span) / (ENEMIES.grunt.hp * hpMul)) * waveCurve(k) * pressure * swarm * (last && stage.boss ? 0.6 : 1);
+    const introAt = (p) => Math.round(p.from * 2.2); // tiers 0..3 spread over the 12 rounds
+    const avail = stage.pool.filter((p) => introAt(p) <= k);
     const wsum = avail.reduce((a, p) => a + p.w, 0);
-    const span = 12 + k * 2;
     avail.forEach((p, i) => {
       let n = Math.round((budget * p.w) / wsum / COST[p.e]);
-      if (p.from === k && p.from > 0) n = Math.max(n, 2);
+      // A new enemy type debuts in small numbers (heavy types as a single unit so the round stays affordable).
+      if (introAt(p) === k && introAt(p) > 0) n = Math.max(n, COST[p.e] <= 3 ? 2 : 1);
       if (n < 1) return;
       const at = i * 1.6;
       groups.push({ e: p.e, n, every: Math.max(0.3, (span - at) / n), at });
@@ -132,7 +149,7 @@ export function survivalWave(n) {
     { e: 'sentinel', from: 5, w: 1.2 }, { e: 'slimeling', from: 6, w: 2 },
   ];
   const isBoss = n > 0 && n % 10 === 9;
-  const budget = (9 + n * 2.2) * ramp(n) * (isBoss ? 0.6 : 1);
+  const budget = (9 + n * 2.2) * Math.min(1, 0.35 + 0.1 * n) * (isBoss ? 0.6 : 1);
   const avail = pool.filter((p) => p.from <= n);
   const wsum = avail.reduce((a, p) => a + p.w, 0);
   const span = Math.min(30, 12 + n * 0.6);

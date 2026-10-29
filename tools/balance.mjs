@@ -6,13 +6,12 @@ import { TUNE } from '../js/data/enemies.js';
 import { STAGES, STAGE_BY_ID } from '../js/data/stages.js';
 import { HEROES, levelCap } from '../js/data/heroes.js';
 import { UPGRADES } from '../js/data/upgrades.js';
-import { squadPower } from '../js/progression.js';
+import { squadPower, expectedLevel, expectedRank } from '../js/progression.js';
 
 export function expectedSquad(stageIdx, ids) {
-  // Rough "typical player" model: levels/ranks grow with campaign progress.
-  const lv = Math.min(1 + Math.round(stageIdx * 1.35), 24);
-  const rank = Math.min(1 + Math.floor(stageIdx / 3), 5);
-  return ids.map((id) => ({ id, lv: Math.min(lv, levelCap(rank)), rank, skin: 'default' }));
+  // Rough "typical player" model (shared with the wave budget in js/data/stages.js).
+  const lv = expectedLevel(stageIdx), rank = expectedRank(stageIdx);
+  return ids.map((id) => ({ id, lv, rank, skin: 'default' }));
 }
 
 export function playRun({ stage, hard = false, squad, seed = 1, research = {}, cutSkill = 0.5, maxTime = 900, survival = false }) {
@@ -26,6 +25,8 @@ export function playRun({ stage, hard = false, squad, seed = 1, research = {}, c
       // Prefer offense/defense by simple scoring.
       const score = (id) => {
         if (id.startsWith('summon:')) return 99; // a sensible player always takes the new hero
+        if (id === 'slicer_chambers') return 50 + g.ammo.starve * 40; // ...and feeds the revolver when heroes are waiting on ammo
+        if (id === 'quick_slicer' || id === 'deep_pile') return 4 + g.ammo.starve * 25 + rng();
         const u = UPGRADES[id];
         let s = rng();
         if (u.cat === 'defense' && g.base.hp / g.base.max < 0.6) s += 1.2;

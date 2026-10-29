@@ -31,7 +31,7 @@ export function openSettings() {
     h('h3', { class: 'muted', style: { fontSize: '.75rem', letterSpacing: '.1em', margin: '14px 0 0' } }, 'GAMEPLAY'),
     toggle('Auto-cast abilities', 'autoAbility', 'Heroes use abilities when ready'),
     toggle('Damage numbers', 'damageNumbers'),
-    h('div', { class: 'setting' }, h('span', null, 'Default combat speed'),
+    h('div', { class: 'setting' }, h('div', null, 'Default combat speed', h('small', null, '2× unlocks per stage once you have cleared it')),
       h('div', { class: 'row' }, [1, 2].map((v) => h('button', { class: 'chip' + (p().speed === v ? ' sel' : ''), onclick: (e) => { set('speed', v); e.target.parentNode.querySelectorAll('.chip').forEach((c, i) => c.classList.toggle('sel', i + 1 === v)); } }, v + '×')))),
     h('h3', { class: 'muted', style: { fontSize: '.75rem', letterSpacing: '.1em', margin: '14px 0 0' } }, 'ACCESSIBILITY'),
     toggle('Reduce screen shake', 'reduceShake'),

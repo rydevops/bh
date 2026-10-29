@@ -1,7 +1,14 @@
 // Hero stat derivation, power rating and unlock rules shared by UI and simulation.
 
-import { HEROES, LEVEL_GROWTH, RANK_GROWTH, RANK_PERKS, levelCap } from './data/heroes.js';
+import { HEROES, LEVEL_GROWTH, RANK_GROWTH, RANK_PERKS, MAX_RANK, levelCap } from './data/heroes.js';
 import { researchBonuses } from './data/research.js';
+
+/**
+ * "Typical player" progression used to size enemy waves (and by tools/balance.mjs): hero level and rank by the
+ * stage index a player is expected to be at. Waves are budgeted from what that squad can actually output.
+ */
+export const expectedRank = (stageIdx) => Math.min(1 + Math.floor(stageIdx / 3), MAX_RANK);
+export const expectedLevel = (stageIdx) => Math.min(1 + Math.round(stageIdx * 1.35), 24, levelCap(expectedRank(stageIdx)));
 
 export const levelMult = (lv) => 1 + LEVEL_GROWTH * (lv - 1);
 export const rankMult = (rank) => 1 + RANK_GROWTH * (rank - 1);
