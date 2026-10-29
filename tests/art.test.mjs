@@ -12,21 +12,43 @@ test('Vanguard sprite sheet is a transparent PNG matching its atlas', () => {
   assert.equal(png.subarray(1, 4).toString(), 'PNG');
   const w = png.readUInt32BE(16), h = png.readUInt32BE(20), colorType = png[25];
   assert.equal(colorType, 6, 'RGBA, so the background is transparent');
-  for (const name of ['idle', 'fire', 'ability', 'icon']) {
+  const names = ['idle', 'fire_1', 'fire_2', 'overdrive_1', 'overdrive_2', 'icon'];
+  assert.deepEqual(Object.keys(atlas.frames), names);
+  for (const name of names) {
     const f = atlas.frames[name];
-    assert.ok(f, name + ' frame exists');
     assert.ok(f.x >= 0 && f.y >= 0 && f.x + f.w <= w && f.y + f.h <= h, `${name} lies inside the ${w}x${h} sheet`);
   }
   assert.equal(atlas.image, 'vanguard.png');
-  const { idle, fire, ability, icon } = atlas.frames;
+  const idle = atlas.frames.idle, icon = atlas.frames.icon;
   assert.deepEqual([idle.w, idle.h], [atlas.logical.w * atlas.scale, atlas.logical.h * atlas.scale]);
-  assert.deepEqual([fire.w, fire.h, ability.w, ability.h], [idle.w, idle.h, idle.w, idle.h]);
+  for (const n of names.slice(0, 5)) assert.deepEqual([atlas.frames[n].w, atlas.frames[n].h], [idle.w, idle.h], n + ' has the world-box size');
   assert.equal(icon.w, icon.h, 'the icon is square');
-  assert.ok(atlas.animations && atlas.animations.idle.bob.periodMs > 0, 'the artist\'s idle bob timing is carried over');
-  assert.ok(atlas.frames.fire.duration > 0, 'and the fire frame duration');
   const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
   const list = Object.values(atlas.frames);
   for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) assert.ok(!overlaps(list[i], list[j]), 'frames do not overlap');
+  // every animation only names frames that exist
+  for (const [name, a] of Object.entries(atlas.animations)) for (const f of a.frames) assert.ok(atlas.frames[f], `${name} uses ${f}`);
+  assert.deepEqual(atlas.animations.fire.frames, ['fire_1', 'fire_2']);
+  assert.deepEqual(atlas.animations.ability.frames, ['overdrive_1', 'overdrive_2']);
+});
+
+test('the right frame is chosen: idle, then the two fire frames after a shot, and the alternating Overdrive frames', async () => {
+  const { artPose, _setSheet, _resetArt } = await import('../js/render/art.js');
+  _resetArt(); _setSheet('vanguard:default', atlas);
+  const pose = (o) => artPose('vanguard', 'default', o);
+  assert.equal(pose({}), 'idle');
+  assert.equal(pose({ sinceShot: 0 }), 'fire_1');
+  assert.equal(pose({ sinceShot: 0.069 }), 'fire_1');
+  assert.equal(pose({ sinceShot: 0.071 }), 'fire_2');
+  assert.equal(pose({ sinceShot: 0.139 }), 'fire_2');
+  assert.equal(pose({ sinceShot: 0.141 }), 'idle', 'back to idle after the fire animation');
+  assert.equal(pose({ ability: true, time: 0 }), 'overdrive_1');
+  assert.equal(pose({ ability: true, time: 0.179 }), 'overdrive_1');
+  assert.equal(pose({ ability: true, time: 0.181 }), 'overdrive_2');
+  assert.equal(pose({ ability: true, time: 0.361 }), 'overdrive_1', 'it loops');
+  assert.equal(pose({ ability: true, sinceShot: 0 }), 'overdrive_1', 'the ability pose wins over firing');
+  assert.equal(artPose('rook', 'default', { sinceShot: 0 }), 'idle', 'procedural heroes always idle');
+  _resetArt();
 });
 
 test('the art ships with the game (precached, part of the build id)', () => {

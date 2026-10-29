@@ -1,44 +1,134 @@
 {
-  "image": "vanguard_new.png",
-  "scale": 4,
+  "image": "vanguard_original_animated.png",
+  "size": {
+    "w": 1400,
+    "h": 960
+  },
+  "scale": 1,
   "logical": {
-    "w": 72,
-    "h": 112
+    "w": 280,
+    "h": 570
   },
   "frames": {
     "idle": {
-      "x": 0,
-      "y": 0,
-      "w": 288,
-      "h": 448,
-      "duration": 800,
-      "loop": true,
-      "description": "Confident planted stance; rifle upright."
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 570
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 570
+      },
+      "sourceSize": {
+        "w": 280,
+        "h": 570
+      }
     },
-    "fire": {
-      "x": 288,
-      "y": 0,
-      "w": 288,
-      "h": 448,
-      "duration": 100,
-      "loop": false,
-      "description": "Single-shot frame with bright upward muzzle flash; return to idle after playback."
+    "fire_1": {
+      "frame": {
+        "x": 280,
+        "y": 0,
+        "w": 280,
+        "h": 570
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 570
+      },
+      "sourceSize": {
+        "w": 280,
+        "h": 570
+      }
     },
-    "ability": {
-      "x": 576,
-      "y": 0,
-      "w": 288,
-      "h": 448,
-      "duration": 300,
-      "loop": true,
-      "description": "Overdrive stance with golden aura and rising sparks; use for ability duration."
+    "fire_2": {
+      "frame": {
+        "x": 560,
+        "y": 0,
+        "w": 280,
+        "h": 570
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 570
+      },
+      "sourceSize": {
+        "w": 280,
+        "h": 570
+      }
+    },
+    "overdrive_1": {
+      "frame": {
+        "x": 840,
+        "y": 0,
+        "w": 280,
+        "h": 570
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 570
+      },
+      "sourceSize": {
+        "w": 280,
+        "h": 570
+      }
+    },
+    "overdrive_2": {
+      "frame": {
+        "x": 1120,
+        "y": 0,
+        "w": 280,
+        "h": 570
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 570
+      },
+      "sourceSize": {
+        "w": 280,
+        "h": 570
+      }
     },
     "icon": {
-      "x": 0,
-      "y": 448,
-      "w": 256,
-      "h": 256,
-      "description": "Head-and-shoulders portrait for hero and ability UI."
+      "frame": {
+        "x": 0,
+        "y": 570,
+        "w": 360,
+        "h": 390
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 390
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 390
+      }
     }
   },
   "animations": {
@@ -46,29 +136,41 @@
       "frames": [
         "idle"
       ],
-      "fps": 1.25,
+      "frameDurationMs": 500,
       "loop": true,
-      "bob": {
-        "y": 2,
-        "periodMs": 800
-      }
+      "notes": "Use subtle vertical bob in renderer."
     },
     "fire": {
       "frames": [
-        "fire"
+        "fire_1",
+        "fire_2"
       ],
-      "fps": 10,
-      "loop": false,
-      "onComplete": "idle",
-      "muzzleDirection": "up"
-    },
-    "overdrive": {
-      "frames": [
-        "ability"
+      "frameDurationsMs": [
+        70,
+        70
       ],
-      "fps": 3.33,
       "loop": true,
-      "muzzleDirection": "up"
+      "direction": "upward",
+      "notes": "Frame 2 has a smaller muzzle flash. Stop on release and return to idle."
+    },
+    "ability": {
+      "frames": [
+        "overdrive_1",
+        "overdrive_2"
+      ],
+      "frameDurationsMs": [
+        180,
+        180
+      ],
+      "loop": true,
+      "notes": "Alternate aura/spark pose while Overdrive is active; return to idle when it ends."
+    },
+    "icon": {
+      "frames": [
+        "icon"
+      ],
+      "loop": false
     }
-  }
+  },
+  "layoutNotes": "Generated from the previously generated Vanguard artwork, not the user-provided placeholder sheet. Full-body frame cells are 280x570 across the top; portrait occupies the lower-left region. Transparent background."
 }
