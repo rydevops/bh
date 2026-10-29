@@ -24,6 +24,27 @@ export function setEdgeColor(color) {
   document.documentElement.style.setProperty('--edge', color || 'var(--bg)');
 }
 
+// -------------------------------------------------------------------- orientation
+/** Wide screens (phones turned sideways, tablets, desktop windows) get the landscape layout. Shared by CSS (body.landscape) and JS. */
+export const LANDSCAPE_RATIO = 1.2;
+export const isLandscape = () => document.body.classList.contains('landscape');
+
+/** Sets body.landscape from the window shape. Returns true when it changed. */
+export function applyOrientation() {
+  const land = window.innerWidth / Math.max(1, window.innerHeight) >= LANDSCAPE_RATIO;
+  if (land === isLandscape()) return false;
+  document.body.classList.toggle('landscape', land);
+  return true;
+}
+
+/** Keep body.landscape current; `onChange` runs after a flip (rotate, window resize across the threshold). */
+export function watchOrientation(onChange) {
+  const check = () => { if (applyOrientation() && onChange) onChange(isLandscape()); };
+  addEventListener('resize', check);
+  addEventListener('orientationchange', () => setTimeout(check, 150));
+  applyOrientation();
+}
+
 export function go(name, params = {}) {
   setEdgeColor(null); // screens that want a different colour (title, combat) set it themselves
   if (current && current.destroy) { try { current.destroy(); } catch (e) { console.error(e); } }

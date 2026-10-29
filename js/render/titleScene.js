@@ -6,7 +6,8 @@ import { heroSprite, enemySprite } from './sprites.js';
 import { SKY, makeScenery } from './scenery.js';
 import { RNG } from '../util.js';
 
-const W = 360;
+const W0 = 360; // portrait world width; wide screens get a wider world at the same height scale
+const LAND_H = 560;
 const WORLD_SECONDS = 11; // how long each world stays on screen
 const FADE = 1.4;         // crossfade between worlds
 
@@ -23,20 +24,23 @@ export function startTitleScene(canvas, squad, opts = {}) {
   const ctx = canvas.getContext('2d');
   const rng = new RNG(2024);
   let raf = 0, stopped = false, t = 0, last = performance.now();
-  let k = 1, H = 700, hy = 260, wallY = 480, scn = null;
+  let W = W0, k = 1, H = 700, hy = 260, wallY = 480, scn = null;
   let foes = [], shots = [], parts = [], spawnT = 0.5, lastTop = null;
   const heroes = (squad && squad.length ? squad : [{ id: 'vanguard', skin: 'default' }, { id: 'rook', skin: 'default' }, { id: 'patch', skin: 'default' }]).slice(0, 4)
-    .map((s, i, a) => ({ ...s, x: (W * (i + 1)) / (a.length + 1), cd: 0.3 + i * 0.17, recoil: 0 }));
+    .map((s, i) => ({ ...s, x: 0, cd: 0.3 + i * 0.17, recoil: 0 }));
+  const placeHeroes = () => { const n = heroes.length, gap = Math.min(W / (n + 1), 110); heroes.forEach((h, i) => { h.x = W / 2 + (i - (n - 1) / 2) * gap; }); };
 
   function resize() {
     const dpr = Math.min(devicePixelRatio || 1, 2);
     const cw = canvas.clientWidth, ch = canvas.clientHeight;
     if (!cw || !ch) return false;
-    if (canvas.width === Math.round(cw * dpr) && scn) return true;
+    if (canvas.width === Math.round(cw * dpr) && canvas.height === Math.round(ch * dpr) && scn) return true;
     canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
-    k = canvas.width / W; H = canvas.height / k;
+    if (cw / ch >= 1.15) { H = LAND_H; k = canvas.height / H; W = canvas.width / k; } // landscape: same scene height, a wider world
+    else { W = W0; k = canvas.width / W; H = canvas.height / k; }
     hy = H * 0.34; wallY = H * 0.78;
-    scn = makeScenery({ pxW: canvas.width, pxH: canvas.height, k, H, hy, wallY });
+    placeHeroes(); foes = []; shots = []; parts = [];
+    scn = makeScenery({ pxW: canvas.width, pxH: canvas.height, k, H, hy, wallY, W });
     return true;
   }
 
@@ -47,7 +51,7 @@ export function startTitleScene(canvas, squad, opts = {}) {
   const depth = (y) => 0.7 + 0.7 * Math.max(0, Math.min(1, (y - hy) / (wallY - hy))); // perspective: bigger as they near the wall
   function spawnFoe(wi) {
     const type = FOES[wi][Math.floor(rng.next() * FOES[wi].length)];
-    foes.push({ type, wi, x: 30 + rng.next() * 300, y: hy + 4, hp: type === 'bulwark' ? 7 : 3, t: rng.next() * 6, sp: type === 'runner' || type === 'slimeling' ? 38 : type === 'bulwark' ? 16 : 26, fly: type === 'drone' });
+    foes.push({ type, wi, x: 30 + rng.next() * (W - 60), y: hy + 4, hp: type === 'bulwark' ? 7 : 3, t: rng.next() * 6, sp: type === 'runner' || type === 'slimeling' ? 38 : type === 'bulwark' ? 16 : 26, fly: type === 'drone' });
   }
   function burst(x, y, n, col, speed = 90) { for (let i = 0; i < n; i++) { const a = rng.next() * 6.28, s = speed * (0.3 + rng.next() * 0.7); parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 20, life: 0.5 + rng.next() * 0.3, max: 0.8, col }); } }
 

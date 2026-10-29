@@ -5,7 +5,7 @@ const OUT = process.env.SHOTS ? process.env.SHOTS + '/s_' : null;
 (async () => {
   const srv = spawn('node', [require('path').join(__dirname, '../serve.mjs'), '8094'], { stdio: 'ignore' }); await new Promise(r => setTimeout(r, 600));
   const b = await chromium.launch();
-  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+  const ctx = await b.newContext({ viewport: { width: +(process.env.VW || 390), height: +(process.env.VH || 844) }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
   const p = await ctx.newPage();
   const errs = [];
   p.on('console', m => { if (['error', 'warning'].includes(m.type())) { errs.push(m.text()); console.log('[' + m.type() + ']', m.text()); } });

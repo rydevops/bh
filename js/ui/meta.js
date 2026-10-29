@@ -42,8 +42,8 @@ registerScreen('research', () => {
       h('div', { class: 'panel', style: { marginBottom: '12px' } },
         h('div', { style: { fontWeight: 900, marginBottom: '4px' } }, 'What is CUT?'),
         h('div', { class: 'muted', style: { fontSize: '.8rem', lineHeight: 1.4 } },
-          'Enemies shoot bullets at your wall. Swipe your finger across one to slice it out of the air before it hits. Each slice costs 5 energy from the CUT bar (bottom of the battle screen), the bar slowly refills, heavy bombs need several cuts, and every bullet you fully cut drops into your ammo pile and charges your hero abilities a little.')),
-      rows),
+          'Enemies shoot bullets at your wall. Swipe your finger across one to slice it out of the air before it hits. Each slice costs 5 energy from the CUT bar (on the battle screen), the bar slowly refills, heavy bombs need several cuts, and every bullet you fully cut drops into your ammo pile and charges your hero abilities a little.')),
+      h('div', { class: 'rs-grid' }, rows)),
     navBar('research'));
   return { el };
 });

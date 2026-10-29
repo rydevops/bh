@@ -12,7 +12,7 @@ import { applyRunResult } from '../economy.js';
 import { store } from '../store.js';
 import { audio } from '../audio/index.js';
 import { initTutorial, tutorialTick } from './tutorial.js';
-import { go, haptic, openSheet, confirmBox, applySettings, sfx, toast, setEdgeColor } from './app.js';
+import { go, isLandscape, haptic, openSheet, confirmBox, applySettings, sfx, toast, setEdgeColor } from './app.js';
 
 const STEP = 1 / 60;
 let session = null;
@@ -26,6 +26,8 @@ export function measureSafeArea() {
 }
 
 export const inCombat = () => !!session;
+/** The live battle (tests and tools only). */
+export const currentSession = () => session;
 
 /**
  * Begin a battle.
@@ -44,7 +46,7 @@ export function startCombat(opts) {
   const canvas = document.getElementById('game');
   const cssW = app.clientWidth, cssH = app.clientHeight;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const layout = layoutFor(cssW, cssH, safeBottom);
+  const layout = layoutFor(cssW, cssH, safeBottom, isLandscape());
   const settings = p.settings;
 
   const runId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -56,7 +58,7 @@ export function startCombat(opts) {
     game.baseMax0 *= 3; game.recomputeMods(false); game.base.hp = game.base.max; game.summonMissed = 1;
   }
   const renderer = new Renderer(canvas);
-  renderer.resize(cssW, cssH, dpr);
+  renderer.resize(cssW, cssH, dpr, layout);
   renderer.attach(game, settings, p.trail);
 
   const s = session = {
@@ -68,6 +70,7 @@ export function startCombat(opts) {
   };
   document.body.classList.add('in-combat');
   buildHud(s);
+  placeHud(s);
   if (tutorial) { initTutorial(s); s.tutExit = (how) => leaveTutorial(s, how); }
   renderer.onEvent = (e) => onEvent(s, e);
   // The status-bar strip matches the top row of this world's sky (see setEdgeColor).
@@ -82,6 +85,13 @@ export function startCombat(opts) {
   return s;
 }
 
+/** Tell the HUD (CSS) where the battlefield column sits, so the side panels in landscape line up with it. */
+function placeHud(s) {
+  const hud = document.getElementById('hud');
+  hud.style.setProperty('--field-x', s.layout.ox + 'px');
+  hud.style.setProperty('--field-w', s.layout.fieldW + 'px');
+}
+
 function playBattleMusic(s, boss, world) {
   const name = boss ? 'boss' : 'battle' + (world ?? 0);
   if (s.lastMusic === name) return;
@@ -94,6 +104,7 @@ function playBattleMusic(s, boss, world) {
  * Measured from the real layout, so it is right on every phone and with or without a notch.
  */
 function measureEngage(s) {
+  if (s.layout.landscape) { s.game.engageY = 24; return; } // nothing overlaps the field in landscape: enemies count as soon as they walk in
   const app = document.getElementById('app');
   const base = s.hud && s.hud.base;
   if (!app || !base) return;
@@ -198,9 +209,9 @@ function updateTips(s, dt) {
   const g = s.game;
   if (g.state !== 'combat' || s.paused) return;
   if (g.t > 0.8) tip(s, 'tipAuto', g.reserve.length ? 'Your hero fires automatically. Clear waves to summon the rest of your squad!' : 'Your heroes fire automatically. Hold the wall!');
-  if (g.t > 8 && g.heroes.some((h) => h.ab.cd <= 0)) tip(s, 'tipAbility', 'Tap a hero portrait below to unleash their ability.');
+  if (g.t > 8 && g.heroes.some((h) => h.ab.cd <= 0)) tip(s, 'tipAbility', isLandscape() ? 'Tap a hero portrait on the right to unleash their ability.' : 'Tap a hero portrait below to unleash their ability.');
   if (g.ammo.starve > 0.35 && g.ammo.pile < 1) tip(s, 'tipAmmo', 'Out of ammo! Heroes wait while the revolver slices more. Pick Slicer Chambers to cut more bullets per cycle.', 5);
-  if (g.ebullets.items.length > 0) tip(s, 'tipCut', 'Swipe a finger across enemy bullets to CUT them before they hit the wall. Each cut costs CUT energy (bar at the bottom), refills the ammo pile and charges abilities!', 5);
+  if (g.ebullets.items.length > 0) tip(s, 'tipCut', 'Swipe a finger across enemy bullets to CUT them before they hit the wall. Each cut costs CUT energy (the CUT bar), refills the ammo pile and charges abilities!', 5);
 }
 
 // ---------------------------------------------------------------------- input (bullet cutting)
@@ -208,7 +219,8 @@ function bindInput(s) {
   const c = s.canvas;
   const toWorld = (e) => {
     const r = c.getBoundingClientRect();
-    return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * s.game.H };
+    const L = s.layout; // the battlefield may be a centred column (landscape): undo its offset and scale
+    return { x: (e.clientX - r.left - L.ox) / L.k, y: (e.clientY - r.top) / L.k };
   };
   let down = false, last = null;
   const add = (e) => {
@@ -249,14 +261,15 @@ function relayout(s) {
   const cssW = app.clientWidth, cssH = app.clientHeight;
   if (!cssW || !cssH || (cssW === s.cssW && cssH === s.cssH)) return;
   s.cssW = cssW; s.cssH = cssH;
-  const L = layoutFor(cssW, cssH, safeBottom);
+  const L = layoutFor(cssW, cssH, safeBottom, isLandscape());
   const g = s.game;
   s.layout = L;
   g.H = L.H; g.wallY = L.wallY; g.heroY = L.heroY;
+  placeHud(s);
   measureEngage(s);
   for (const hh of g.allHeroes) hh.y = L.heroY;
   for (const t of g.turrets) t.y = L.wallY - 6;
-  s.renderer.resize(cssW, cssH, s.dpr);
+  s.renderer.resize(cssW, cssH, s.dpr, L);
 }
 
 // ---------------------------------------------------------------------- HUD
@@ -384,7 +397,7 @@ function showUpgrade(s) {
         h('div', { class: 'muted', style: { fontWeight: 800, letterSpacing: '.12em', fontSize: '.78rem' } }, g.survival ? `WAVE ${g.waveIdx + 1} CLEARED` : `WAVE ${g.waveIdx + 1} / ${g.waveCount} CLEARED`),
         h('h2', { class: 'title', style: { fontSize: '1.8rem', margin: '2px 0 4px' } }, 'Choose an upgrade'),
         h('div', { class: 'muted', style: { fontSize: '.8rem' } }, g.reserve.length ? 'Summon your next hero - or take an upgrade. Summon rewards keep coming each wave.' : 'Upgrades last until the end of this run.')),
-      cards,
+      h('div', { class: 'upg-grid' }, cards),
       h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '14px' } }, reroll),
       owned.length ? h('div', { class: 'owned-row' }, owned) : null));
   };

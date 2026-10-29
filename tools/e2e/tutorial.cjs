@@ -8,7 +8,7 @@ const SHOTS = process.env.SHOTS ? process.env.SHOTS + '/tut_' : null;
   let fails = 0;
   const ok = (m) => console.log('ok  - ' + m);
   const fail = (m) => { fails++; console.log('FAIL: ' + m); };
-  const fresh = async (vp = { width: 402, height: 874 }) => {
+  const fresh = async (vp = { width: +(process.env.VW || 402), height: +(process.env.VH || 874) }) => {
     const ctx = await b.newContext({ viewport: vp, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
     const p = await ctx.newPage();
     p.on('pageerror', e => fail('pageerror: ' + e.message));
