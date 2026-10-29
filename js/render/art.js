@@ -2,8 +2,9 @@
 //
 //   art/<hero>.png   transparent sprite sheet           art/<hero>.json   where every frame lives in it
 //
-// Frames: `idle`, `fire` (shot / muzzle flash), `ability` (ability active) - all drawn for the same 72x112 world box -
-// and `icon`, a square bust used for portraits and app icons. A hero or skin without a registered sheet keeps using the
+// The atlas lists named frames - `idle`, the `fire_*` and `overdrive_*` poses... all drawn for the same 72x112 world box -
+// plus `icon`, a square bust used for portraits and app icons, and `animations` that say which frames play when
+// (`fire` after a shot, `ability` while it is active) and for how long. A hero or skin without a registered sheet keeps using the
 // procedural sprite, and a sheet that fails to load falls back to it too, so the game always renders.
 
 const SHEETS = {
@@ -50,27 +51,50 @@ export function artFrame(heroId, skinId, name = 'idle') {
   return f ? { img: sh.img, x: f.x, y: f.y, w: f.w, h: f.h, logicalW: sh.w, logicalH: sh.h } : null;
 }
 
+const durations = (anim, n) => {
+  const per = anim.frameDurationsMs || (anim.frameDurationMs ? Array(n).fill(anim.frameDurationMs) : null);
+  return Array.from({ length: n }, (_, i) => (per && per[i]) || 100);
+};
+
+/** Frame list + per-frame durations (ms) for an animation, or null when the sheet has none by that name. */
+function sequence(sh, name, legacyFrame) {
+  const a = sh.animations[name];
+  const frames = (a && a.frames && a.frames.filter((f) => sh.frames[f])) || (sh.frames[legacyFrame] ? [legacyFrame] : []);
+  if (!frames.length) return null;
+  return { frames, ms: durations(a || {}, frames.length) };
+}
+
 /**
- * Timings the artist put in the atlas, or null for procedural heroes:
- *   bobY / bobSec  idle bob (total travel in world px, period in seconds)
- *   fireSec        how long the `fire` frame stays up after a shot
+ * Which frame of the sheet a hero shows right now (`idle` for procedural heroes - the name is then ignored):
+ *   ability  while the ability is active: cycles through the `ability` animation
+ *   fire     for the length of the `fire` animation after a shot (sinceShot, seconds), frame by frame
+ *   idle     otherwise
  */
-export function artAnim(heroId, skinId) {
+export function artPose(heroId, skinId, { ability = false, sinceShot = Infinity, time = 0 } = {}) {
   const sh = artSheet(heroId, skinId);
-  if (!sh) return null;
-  const bob = (sh.animations.idle || {}).bob;
-  const fire = sh.frames.fire || {};
-  return {
-    bobY: bob && bob.y > 0 ? bob.y : null,
-    bobSec: bob && bob.periodMs > 0 ? bob.periodMs / 1000 : null,
-    fireSec: fire.duration > 0 ? fire.duration / 1000 : null,
-  };
+  if (!sh) return 'idle';
+  if (ability) {
+    const seq = sequence(sh, 'ability', 'ability');
+    if (seq) return pick(seq, (time * 1000) % seq.ms.reduce((a, b) => a + b, 0));
+  }
+  const fire = sequence(sh, 'fire', 'fire');
+  if (fire && sinceShot * 1000 < fire.ms.reduce((a, b) => a + b, 0)) return pick(fire, sinceShot * 1000);
+  return 'idle';
 }
 
-export function hasArtFrame(heroId, skinId, name) {
-  const sh = artSheet(heroId, skinId);
-  return !!(sh && sh.frames[name]);
+function pick(seq, ms) {
+  let t = ms;
+  for (let i = 0; i < seq.frames.length; i++) { if (t < seq.ms[i]) return seq.frames[i]; t -= seq.ms[i]; }
+  return seq.frames[seq.frames.length - 1];
 }
 
-/** Test hook. */
+/** Idle bob the artist asked for, if any: { bobY (world px of total travel), bobSec } - otherwise the renderer's default. */
+export function artBob(heroId, skinId) {
+  const sh = artSheet(heroId, skinId);
+  const bob = sh && sh.animations.idle && sh.animations.idle.bob;
+  return bob && bob.y > 0 && bob.periodMs > 0 ? { bobY: bob.y, bobSec: bob.periodMs / 1000 } : null;
+}
+
+/** Test hooks. */
 export function _resetArt() { loaded.clear(); }
+export function _setSheet(key, atlas) { loaded.set(key, { img: null, frames: atlas.frames, animations: atlas.animations || {}, scale: atlas.scale, w: atlas.logical.w, h: atlas.logical.h }); }

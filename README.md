@@ -97,10 +97,10 @@ tests/         node:test suites
 
 Heroes are drawn in code by default (`js/render/sprites.js`). A hero can be switched to real art one at a time:
 
-- `art/<hero>.png` is one transparent sprite sheet and `art/<hero>.json` is its atlas. Frames: `idle`, `fire`, `ability` (the 72 x 112 world box at 6x) and `icon` (a square bust for portraits and the app icon). The exact layout is in `art_desc/SHEET_SPEC.md`.
+- `art/<hero>.png` is one transparent sprite sheet and `art/<hero>.json` is its atlas. Frames: `idle`, `fire_1`/`fire_2` (muzzle flash, 70 ms each after a shot), `overdrive_1`/`overdrive_2` (alternating every 180 ms while the ability is active) - all the 72 x 112 world box at 4x - and `icon` (a square bust for portraits and the app icon). The exact layout is in `art_desc/SHEET_SPEC.md`.
 - `art_desc/<hero>.md` is a short description (500 words max) for the artist.
 - The sheet is registered in `js/render/art.js` (`SHEETS`, keyed `hero:skin`). Anything not registered, and any sheet that fails to load, keeps the procedural sprite, so the game always renders.
-- **Vanguard is the first hero converted** (default skin; his other skins still use the procedural art until they get sheets). The artist's original sheet is kept in `art_src/` and `node tools/art/pack-sheet.mjs vanguard` repacks it into the game's layout (`art/vanguard.png` + `.json`, feet on a shared baseline, the artist's idle-bob and fire-frame timings carried over). `node tools/art/export-sheet.mjs <hero>` makes a placeholder sheet from the procedural art for heroes that have no artwork yet. `node tools/gen-icons.mjs` rebuilds the app icons from the art.
+- **Vanguard is the first hero converted** (default skin; his other skins still use the procedural art until they get sheets). The artist's original sheet is kept in `art_src/` and `node tools/art/pack-sheet.mjs vanguard` repacks it into the game's layout (`art/vanguard.png` + `.json`, boots on a shared baseline, the artist's frame lists and timings carried over). `node tools/art/export-sheet.mjs <hero>` makes a placeholder sheet from the procedural art for heroes that have no artwork yet. `node tools/gen-icons.mjs` rebuilds the app icons from the art.
 
 ## Design-document coverage
 
