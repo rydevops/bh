@@ -523,16 +523,6 @@ test('reload speed-ups stack with ability buffs and are reflected in the next ba
   assert.ok(Math.abs(g.reloadTime(h) - 1.2 * 0.5 * 0.6) < 1e-9);
 });
 
-test('starved squads see more revolver upgrade cards', () => {
-  const rng = (seed) => new RNG(seed);
-  const count = (pressure) => {
-    let n = 0;
-    for (let i = 0; i < 300; i++) if (rollUpgrades(rng(i), { owned: {}, squadTags: new Set(['rapid']), enemyTags: new Set(), wave: 3, baseFrac: 1, ammoPressure: pressure }).includes('slicer_chambers')) n++;
-    return n;
-  };
-  assert.ok(count(1) > count(0) * 2, `${count(1)} vs ${count(0)}`);
-});
-
 // ---------------------------------------------------------------- stage structure and difficulty curve
 test('every stage has 12 rounds and the boss only appears in the last', () => {
   for (const st of STAGES) {
@@ -696,41 +686,35 @@ test('Survival ends every wave with a reward pick, not every second wave', () =>
   assert.equal(rewards, 6);
 });
 
-test('every reward round offers at least one bullet upgrade', () => {
-  const rng = new RNG(21);
+test('every card that can be offered has exactly the same chance, whatever the squad, enemies or build', () => {
+  const rng = new RNG(77);
+  const heroes = new Set(['vanguard', 'rook']);
+  const counts = {};
+  const N = 40000;
+  for (let i = 0; i < N; i++) for (const id of rollUpgrades(rng, { owned: {}, heroes })) counts[id] = (counts[id] || 0) + 1;
+  const eligible = Object.keys(UPGRADES).filter((id) => !UPGRADES[id].requires && (!UPGRADES[id].hero || heroes.has(UPGRADES[id].hero)));
+  assert.ok(eligible.length > 25);
+  assert.deepEqual(Object.keys(counts).sort(), eligible.sort(), 'only offerable cards show up, and all of them do');
+  const expect = (N * 3) / eligible.length;
+  for (const id of eligible) assert.ok(Math.abs(counts[id] - expect) / expect < 0.08, `${id}: ${counts[id]} vs ${Math.round(expect)} expected`);
+  // rarity, tags and revolver / bullet cards get no preference
+  const mean = (ids) => ids.reduce((a, id) => a + counts[id], 0) / ids.length;
+  const by = (f) => eligible.filter((id) => f(UPGRADES[id]));
+  assert.ok(Math.abs(mean(by((u) => u.rarity === 'common')) - mean(by((u) => u.rarity === 'epic'))) / expect < 0.08, 'common and epic cards appear equally often');
+  assert.ok(Math.abs(mean(['slicer_chambers', 'quick_slicer', 'deep_pile']) - expect) / expect < 0.08, 'revolver cards are not favoured');
+});
+
+test('upgrade rolls give three distinct cards, skip maxed cards, missing prerequisites and heroes who are not on the field', () => {
+  const rng = new RNG(4);
+  const owned = { heavy_rounds: 6, quick_reload: 2 };
   for (let i = 0; i < 300; i++) {
-    const picks = rollUpgrades(rng, { owned: {}, squadTags: new Set(['rapid']), enemyTags: new Set(['swarm']), wave: i % 12, baseFrac: 1, n: i % 2 ? 3 : 2, heroes: new Set(['vanguard', 'rook']) });
-    assert.ok(picks.some((id) => UPGRADES[id].bullet), 'picks: ' + picks.join(','));
+    const picks = rollUpgrades(rng, { owned, heroes: new Set(['vanguard']), exclude: ['overclock'] });
+    assert.equal(new Set(picks).size, 3);
+    for (const id of picks) {
+      assert.ok(!(id in owned), id + ' is maxed');
+      assert.notEqual(id, 'overclock');
+      assert.ok(!id.startsWith('turret_'), 'turret upgrades need a turret');
+      assert.ok(!id.startsWith('multishot_') || id === 'multishot_vanguard');
+    }
   }
-  // once every bullet upgrade is maxed, the rule steps aside instead of failing
-  const owned = {};
-  for (const id in UPGRADES) if (UPGRADES[id].bullet) owned[id] = UPGRADES[id].max;
-  const picks = rollUpgrades(new RNG(1), { owned, squadTags: new Set(), enemyTags: new Set(), wave: 5, baseFrac: 1, heroes: new Set(['vanguard']) });
-  assert.equal(picks.length, 3);
-});
-
-test('every reward round also offers a revolver upgrade (chambers, slicer speed or pile) until they are all maxed', () => {
-  const rng = new RNG(33);
-  const REV = ['slicer_chambers', 'quick_slicer', 'deep_pile'];
-  for (let i = 0; i < 400; i++) {
-    const picks = rollUpgrades(rng, { owned: {}, squadTags: new Set(['rapid']), enemyTags: new Set(['swarm']), wave: i % 15, baseFrac: 1, n: i % 2 ? 3 : 2, heroes: new Set(['vanguard', 'rook']), ammoPressure: 0 });
-    assert.ok(picks.some((id) => REV.includes(id)), 'revolver card in: ' + picks.join(','));
-    assert.ok(picks.some((id) => UPGRADES[id].bullet), 'bullet card in: ' + picks.join(','));
-    assert.equal(new Set(picks).size, picks.length);
-  }
-  const owned = { slicer_chambers: 5, quick_slicer: 3, deep_pile: 3 };
-  const picks = rollUpgrades(new RNG(2), { owned, squadTags: new Set(), enemyTags: new Set(), wave: 4, baseFrac: 1, heroes: new Set(['vanguard']) });
-  assert.equal(picks.length, 3);
-  assert.ok(!picks.some((id) => REV.includes(id)));
-});
-
-test('in a long Survival run the revolver keeps getting offered', () => {
-  const g = new Game({ stage: null, squad: squad('vanguard', 'rook', 'patch'), seed: 9, layout: LAYOUT, emit: false });
-  let seen = 0;
-  for (let w = 0; w < 10; w++) {
-    g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.3);
-    if (g.choices.some((id) => ['slicer_chambers', 'quick_slicer', 'deep_pile'].includes(id))) seen++;
-    g.pickUpgrade(g.choices.find((id) => id.startsWith('summon:')) || g.choices[0]);
-  }
-  assert.ok(seen >= 9, `revolver upgrade offered in ${seen}/10 survival rewards`);
 });
