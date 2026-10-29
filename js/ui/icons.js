@@ -24,6 +24,7 @@ const P = {
   wrench: '<path d="M14.700 6.300a4 4 0 0 0 5 5L10 21a2.800 2.800 0 0 1-4-4l9.700-9.700a4 4 0 0 0-1-1z"/>',
   nano: '<circle cx="12" cy="12" r="2"/><circle cx="5" cy="6.500" r="2"/><circle cx="19" cy="6.500" r="2"/><circle cx="5" cy="17.500" r="2"/><circle cx="19" cy="17.500" r="2"/><path d="M6.500 8l4 2.800M17.500 8l-4 2.800M6.500 16l4-2.800M17.500 16l-4-2.800"/>',
   blade: '<path d="M20 4L5 19M14 4h6v6M5 19l-2 2 .5-3.500z"/>',
+  revolver: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="6.2" r="1.5"/><circle cx="17" cy="9" r="1.5"/><circle cx="17" cy="15" r="1.5"/><circle cx="12" cy="17.8" r="1.5"/><circle cx="7" cy="15" r="1.5"/><circle cx="7" cy="9" r="1.5"/>',
   battery: '<rect x="2" y="8" width="17" height="9" rx="2"/><path d="M22 11v3M9.500 9.500L8 13h4l-1.500 3.500"/>',
   dice: '<rect x="4" y="4" width="16" height="16" rx="3.500"/><circle cx="9" cy="9" r=".8"/><circle cx="15" cy="15" r=".8"/><circle cx="15" cy="9" r=".8"/><circle cx="9" cy="15" r=".8"/>',
   heart: '<path d="M12 21C4 15 2 11 2 8a5 5 0 0 1 10-1 5 5 0 0 1 10 1c0 3-2 7-10 13z"/>',

@@ -56,7 +56,9 @@ export function startCombat(opts) {
 
   const s = session = {
     opts, stage, hard, game, renderer, canvas, runId, cssW, cssH, layout, dpr,
-    paused: false, raf: 0, acc: 0, last: performance.now(), speed: settings.speed || 1, trailPts: [], cutBlade: [],
+    // 2x speed is a reward for clearing the stage once (Survival: once you have a best wave).
+    canFast: stage ? !!p.stages[stage.id] : p.survivalBest > 0,
+    paused: false, raf: 0, acc: 0, last: performance.now(), speed: 1, trailPts: [], cutBlade: [],
     hud: null, ended: false, endTimer: 0, tipT: 0, shown: {}, lastMusic: null,
   };
   document.body.classList.add('in-combat');
@@ -131,6 +133,7 @@ function onEvent(s, e) {
     case 'phase': showBanner(s, `PHASE ${g.boss ? g.boss.boss.phase + 1 : ''}`, 'IT GROWS ANGRY', true); haptic(60); break;
     case 'bossExposed': showBanner(s, 'CORE EXPOSED', 'FULL FIREPOWER!', false, 1.2); tip(s, 'tipExposed', 'The boss is exposed - it takes 50% extra damage right now!'); break;
     case 'upgradeOpen': showUpgrade(s); break;
+    case 'slice': break;
     case 'summon': s.joined = g.allHeroes[e.i].def.name.toUpperCase(); haptic(40); break; // announced with the next wave banner
     case 'checkpoint':
       store.update((p) => { p.checkpoint = e.snap; });
@@ -172,6 +175,7 @@ function updateTips(s, dt) {
   if (g.state !== 'combat' || s.paused) return;
   if (g.t > 0.8) tip(s, 'tipAuto', g.reserve.length ? 'Your hero fires automatically. Clear waves to summon the rest of your squad!' : 'Your heroes fire automatically. Hold the wall!');
   if (g.t > 8 && g.heroes.some((h) => h.ab.cd <= 0)) tip(s, 'tipAbility', 'Tap a hero portrait below to unleash their ability.');
+  if (g.ammo.starve > 0.35 && g.ammo.pile < 1) tip(s, 'tipAmmo', 'Out of ammo! Heroes wait while the revolver slices more. Pick Slicer Chambers to cut more bullets per cycle.', 5);
   if (g.ebullets.items.length > 0) tip(s, 'tipCut', 'Swipe across enemy bullets to CUT them before they hit the wall!', 5);
 }
 
@@ -242,7 +246,18 @@ function buildHud(s) {
   hd.bossFill = h('i'); hd.bossShield = h('b');
   hd.boss = h('div', { class: 'bossbar' }, hd.bossFill, hd.bossShield, h('em', { style: { left: '66%' } }), h('em', { style: { left: '33%' } }), h('span', null, hd.bossName, hd.bossPct));
   hd.pauseBtn = h('button', { class: 'hud-btn', 'aria-label': 'Pause', onclick: () => pause(s), html: icon('pause') });
-  hd.speedBtn = h('button', { class: 'hud-btn', 'aria-label': 'Combat speed', onclick: () => { s.speed = s.speed === 1 ? 2 : 1; store.update((p) => { p.settings.speed = s.speed; }); hd.speedBtn.textContent = s.speed + '×'; } }, s.speed + '×');
+  const speedLabel = () => (s.canFast ? s.speed + '×' : '🔒');
+  hd.speedBtn = h('button', {
+    class: 'hud-btn', 'aria-label': s.canFast ? 'Combat speed' : 'Double speed (locked: clear this stage once)',
+    onclick: () => {
+      if (!s.canFast) { toast('Clear this stage once to unlock 2× speed', true); return; }
+      s.speed = s.speed === 1 ? 2 : 1;
+      store.update((p) => { p.settings.speed = s.speed; });
+      hd.speedBtn.textContent = speedLabel();
+    },
+  }, speedLabel());
+  s.speed = s.canFast && store.profile.settings.speed === 2 ? 2 : 1;
+  hd.speedBtn.textContent = speedLabel();
   hd.banner = h('div', { class: 'banner title' });
   hd.tip = h('div', { class: 'tip', role: 'status' });
   hd.cutFill = h('i');

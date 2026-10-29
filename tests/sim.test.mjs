@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/sim/game.js';
-import { STAGE_BY_ID } from '../js/data/stages.js';
+import { STAGE_BY_ID, STAGES, WAVES_PER_STAGE, buildWaves, waveCurve } from '../js/data/stages.js';
 import { computeDamage, resistMult, absorb } from '../js/sim/damage.js';
 import { UPGRADES, modsFromUpgrades, rollUpgrades, defaultMods } from '../js/data/upgrades.js';
 import { RNG } from '../js/util.js';
 import { playRun, expectedSquad } from '../tools/balance.mjs';
+import { ENEMIES } from '../js/data/enemies.js';
+const ENEMY_HP = Object.fromEntries(Object.entries(ENEMIES).map(([k, v]) => [k, v.hp]));
 
 const LAYOUT = { H: 680, wallY: 470, heroY: 524 };
 const squad = (...ids) => ids.map((id) => ({ id, lv: 1, rank: 1, skin: 'default' }));
@@ -89,7 +91,7 @@ test('a piercing projectile applies different resistances to different enemies',
 
 test('boss phase shifts while taking damage: no overkill past the threshold, brief invulnerability, adds', () => {
   const g = new Game({ stage: STAGE_BY_ID['1-4'], squad: squad('vanguard', 'rook', 'patch'), seed: 2, layout: LAYOUT, emit: false, deploy: 'all' });
-  g.startWave(3);
+  g.startWave(11);
   step(g, 2.5);
   const boss = g.boss;
   assert.ok(boss, 'boss spawned');
@@ -109,7 +111,7 @@ test('boss phase shifts while taking damage: no overkill past the threshold, bri
 
 test('boss kill ends the stage in victory', () => {
   const g = new Game({ stage: STAGE_BY_ID['1-4'], squad: squad('vanguard', 'rook', 'patch'), seed: 2, layout: LAYOUT, emit: false, deploy: 'all' });
-  g.startWave(3);
+  g.startWave(11);
   step(g, 2.5);
   const boss = g.boss;
   for (let i = 0; i < 6 && boss.boss.mode === 'enter'; i++) step(g, 1);
@@ -215,9 +217,11 @@ test('every hero ability can be used and has a cooldown', () => {
   }
 });
 
-// ---------------------------------------------------------------- summoning (one hero per battle, rest are rewards)
+// ---------------------------------------------------------------- summoning (one hero per battle, rest are random rewards)
 const fresh = (ids = ['vanguard', 'rook', 'patch'], extra = {}) =>
   new Game({ stage: STAGE_BY_ID['1-1'], squad: squad(...ids), seed: 11, layout: LAYOUT, emit: false, ...extra });
+/** Clear the field so the wave ends and the reward round opens. */
+const checkpoint = (g) => { g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.2); assert.equal(g.state, 'upgrade'); };
 
 test('a battle starts with only the lead hero; the rest wait in reserve', () => {
   const g = fresh();
@@ -227,74 +231,203 @@ test('a battle starts with only the lead hero; the rest wait in reserve', () => 
   assert.equal(g.useAbility(1), false, 'reserve heroes cannot act');
 });
 
-test('after a wave, a summon card for the next squad member is always offered', () => {
-  const g = fresh();
-  g.spawnQ.length = 0; g.enemies.length = 0;
-  step(g, 0.2);
-  assert.equal(g.state, 'upgrade');
-  assert.equal(g.choices.length, 3);
-  assert.equal(g.choices[0], 'summon:rook');
-  assert.equal(new Set(g.choices).size, 3);
-  // rerolling keeps the hero reward on offer
-  g.rerolls = 2;
-  g.reroll();
-  assert.equal(g.choices[0], 'summon:rook');
+test('hero rewards are random, but never two reward rounds in a row without one', () => {
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    const g = fresh(['vanguard', 'rook', 'patch', 'pulse'], { seed });
+    let misses = 0, offers = 0, sawMiss = false;
+    for (let i = 0; i < 12 && g.reserve.length; i++) {
+      checkpoint(g);
+      const offered = g.choices[0].startsWith('summon:');
+      if (offered) { offers++; misses = 0; assert.equal(g.choices[0], 'summon:' + g.reserve[0].id, 'next hero in squad order'); g.pickUpgrade(g.choices[0]); }
+      else { misses++; sawMiss = true; g.pickUpgrade(g.choices[0]); }
+      assert.ok(misses <= 1, `seed ${seed}: two reward rounds in a row without a hero`);
+    }
+    assert.equal(g.reserve.length, 0, `seed ${seed}: squad assembled within 12 rounds`);
+    assert.ok(g.heroes.length === 4 && offers === 3);
+  }
 });
 
-test('picking a summon card deploys the hero, re-centres the formation and starts the next wave', () => {
-  const g = fresh();
-  g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.2);
+test('hero timing really is random: different seeds assemble the squad on different rounds', () => {
+  const when = new Set();
+  for (let seed = 1; seed <= 12; seed++) {
+    const g = fresh(['vanguard', 'rook'], { seed });
+    let n = 0;
+    while (g.reserve.length && n < 5) { checkpoint(g); n++; if (g.choices[0].startsWith('summon:')) g.pickUpgrade(g.choices[0]); else g.pickUpgrade(g.choices[0]); }
+    when.add(n);
+  }
+  assert.ok(when.has(1) && when.has(2), 'sometimes the first reward round has the hero, sometimes the second: ' + [...when]);
+});
+
+test('rerolling keeps an offered hero card; the card deploys the hero and re-centres the formation', () => {
+  let g;
+  for (let seed = 1; seed < 30; seed++) { g = fresh(['vanguard', 'rook', 'patch'], { seed }); checkpoint(g); if (g.choices[0].startsWith('summon:')) break; }
+  assert.equal(g.choices[0], 'summon:rook');
+  g.rerolls = 2; g.reroll();
+  assert.equal(g.choices[0], 'summon:rook');
+  assert.equal(g.choices.length, 3);
   assert.ok(g.pickUpgrade('summon:rook'));
   assert.deepEqual(g.heroes.map((h) => h.id), ['vanguard', 'rook']);
-  assert.equal(g.reserve.length, 1);
-  assert.equal(g.state, 'combat');
-  assert.equal(g.waveIdx, 1);
   assert.deepEqual(g.heroes.map((h) => h.tx), [120, 240]);
-  assert.ok(g.hero(1).spawnT > 0 && g.hero(1).ab.cd > 0, 'arrives with a spawn effect and a half-charged ability');
+  assert.ok(g.hero(1).spawnT > 0 && g.hero(1).ab.cd > 0);
+  assert.equal(g.state, 'combat');
   step(g, 1.5);
   assert.ok(Math.abs(g.heroes[0].x - 120) < 15, 'existing hero glides to the new formation');
-  assert.equal(g.useAbility(0) || true, true);
 });
 
-test('the full squad is assembled by the end of a 3-wave stage (2 checkpoints) and cards stop offering summons', () => {
-  const g = fresh();
-  for (let i = 0; i < 2; i++) {
-    g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.2);
-    assert.ok(g.choices[0].startsWith('summon:'));
-    g.pickUpgrade(g.choices[0]);
+test('summon state (and the pity counter) survives a checkpoint / resume', () => {
+  let g, snap;
+  for (let seed = 1; seed < 30 && !snap; seed++) {
+    g = fresh(['vanguard', 'rook', 'patch'], { seed, emit: true }); checkpoint(g);
+    if (!g.choices[0].startsWith('summon:')) continue;
+    g.pickUpgrade('summon:rook');
+    snap = g.events.filter((e) => e.type === 'checkpoint').pop().snap;
   }
-  assert.equal(g.reserve.length, 0);
-  assert.equal(g.heroes.length, 3);
-  g.spawnQ.length = 0; g.enemies.length = 0;
-  g.waveIdx = 0; g.waveCount; // next checkpoint is a normal upgrade round
-  step(g, 0.2);
-  if (g.state === 'upgrade') assert.ok(g.choices.every((c) => !c.startsWith('summon:')));
-});
-
-test('summon state survives a checkpoint / resume', () => {
-  const g = fresh(['vanguard', 'rook', 'patch'], { emit: true });
-  g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.2);
-  g.pickUpgrade('summon:rook');
-  const snap = g.events.filter((e) => e.type === 'checkpoint').pop().snap;
   assert.deepEqual(snap.deployed, [0, 1]);
+  assert.equal(snap.missed, 0);
   const g2 = new Game({ stage: STAGE_BY_ID['1-1'], squad: squad('vanguard', 'rook', 'patch'), seed: 1, layout: LAYOUT, emit: false, resume: snap });
   assert.deepEqual(g2.heroes.map((h) => h.id), ['vanguard', 'rook']);
   assert.deepEqual(g2.reserve.map((h) => h.id), ['patch']);
 });
 
-test('a single-hero squad never offers summons and plays normally', () => {
+test('a single-hero squad never offers summons', () => {
   const g = fresh(['specter']);
-  assert.equal(g.reserve.length, 0);
-  g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.2);
+  checkpoint(g);
   assert.ok(g.choices.every((c) => !c.startsWith('summon:')));
 });
 
-test('survival keeps offering upgrades every wave until the squad is complete', () => {
-  const g = new Game({ stage: null, squad: squad('vanguard', 'rook', 'patch'), seed: 3, layout: LAYOUT, emit: false });
-  for (let i = 0; i < 2; i++) {
-    g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.2);
-    assert.equal(g.state, 'upgrade', 'wave ' + i);
-    g.pickUpgrade(g.choices[0]);
+// ---------------------------------------------------------------- revolver ammo economy
+const lone = (extra = {}) => {
+  const g = fresh(['vanguard'], extra);
+  g.spawnQ.length = 0; g.enemies.length = 0;
+  // An inert, untargetable enemy far off-screen keeps the wave "running" so the sim doesn't stop for a reward round.
+  const dummy = g.spawnEnemy('grunt', 10, { y: -500 }); dummy.speed = 0; dummy.hp = dummy.max = 1e12;
+  return g;
+};
+
+test('the revolver starts with one bullet per cut and a small pile', () => {
+  const g = lone();
+  assert.equal(g.ammo.perCycle, 1);
+  assert.equal(g.ammo.pile, 6);
+  assert.ok(Math.abs(g.ammo.cycle - 0.36) < 1e-9);
+});
+
+test('the slicer cuts bullets into the pile each cycle, up to the pile capacity', () => {
+  const g = lone();
+  g.ammo.pile = 0;
+  step(g, 3.6); // ten cycles
+  assert.ok(g.ammo.pile >= 9 && g.ammo.pile <= 10, 'about 1 per cycle: ' + g.ammo.pile);
+  step(g, 20);
+  assert.equal(g.ammo.pile, g.ammo.cap, 'never overfills');
+});
+
+test('each hero shot takes one bullet from the pile; a dry pile makes the hero wait for the slicer', () => {
+  const g = lone();
+  g.spawnEnemy('grunt', 180, { y: 250 }).hp = 1e9;
+  g.ammo.pile = 3; g.ammo.cycleBase = 1e6; g.ammo.cycle = 1e6; // freeze the revolver
+  g.heroes[0].cd = 0;
+  step(g, 3);
+  assert.equal(g.ammo.pile, 0, 'three bullets spent');
+  assert.equal(g.ammo.taken, 3);
+  assert.ok(g.heroes[0].dry, 'hero is dry and waiting');
+  const shotsBefore = g.heroes[0].shots;
+  step(g, 2);
+  assert.equal(g.heroes[0].shots, shotsBefore, 'no shots without ammo');
+  g.ammo.pile = 2; // the revolver delivers
+  step(g, 1);
+  assert.ok(g.heroes[0].shots > shotsBefore, 'fires again once bullets arrive');
+});
+
+test('slicer upgrades: 1 -> 6 bullets per cut, faster cycle, deeper pile (capped)', () => {
+  const g = lone();
+  g.owned = { slicer_chambers: 5, quick_slicer: 3, deep_pile: 3 }; g.recomputeMods(false);
+  assert.equal(g.ammo.perCycle, 6);
+  assert.ok(g.ammo.cycle < 0.36 * 0.6);
+  assert.equal(g.ammo.cap, 12 + 24);
+  g.owned = { slicer_chambers: 99 }; g.recomputeMods(false);
+  assert.equal(g.ammo.perCycle, 6, 'hard cap of six');
+});
+
+test('multi-shot: default one bullet per shot, up to five via upgrades, each costing ammo', () => {
+  const g = lone(); g.spawnEnemy('grunt', 180, { y: 260 }).hp = 1e9;
+  g.heroes[0].cd = 0; g.ammo.cycle = 1e6; g.ammo.pile = 20;
+  step(g, 0.03);
+  assert.equal(g.ammo.taken, 1, 'default: one bullet');
+  const g2 = lone(); g2.spawnEnemy('grunt', 180, { y: 260 }).hp = 1e9;
+  g2.owned = { extended_mag: 4 }; g2.recomputeMods(false);
+  assert.equal(g2.mods.proj, 4);
+  g2.heroes[0].cd = 0; g2.ammo.cycle = 1e6; g2.ammo.pile = 20;
+  step(g2, 0.03);
+  assert.equal(g2.ammo.taken, 5, 'max: five bullets from one shot');
+  const g3 = lone(); g3.spawnEnemy('grunt', 180, { y: 260 }).hp = 1e9;
+  g3.owned = { extended_mag: 4 }; g3.recomputeMods(false);
+  g3.heroes[0].cd = 0; g3.ammo.cycle = 1e6; g3.ammo.pile = 2;
+  step(g3, 0.03);
+  assert.equal(g3.ammo.taken, 2, 'partial volley when the pile runs short');
+});
+
+test('cutting an enemy bullet recycles it onto the pile', () => {
+  const g = lone(); g.ammo.cycle = 1e6; g.ammo.pile = 2;
+  g.spawnEnemyBullet(100, 200, 0, 50, 5, 5, 1, 'spit');
+  g.spawnEnemyBullet(200, 200, 0, 50, 20, 14, 1, 'bomb');
+  g.cutSegment(80, 200, 120, 200);
+  assert.equal(g.ammo.pile, 3);
+  g.cutSegment(180, 200, 220, 200);
+  assert.equal(g.ammo.pile, 5, 'a bomb is worth two');
+});
+
+test('beam and flame heroes burn ammo and stop when the pile is empty', () => {
+  for (const id of ['pulse', 'ember']) {
+    const g2 = fresh([id], { deploy: 'all' });
+    g2.spawnQ.length = 0; g2.enemies.length = 0;
+    const e = g2.spawnEnemy('grunt', 180, { y: g2.wallY - 90 }); e.hp = e.max = 1e9;
+    g2.ammo.pile = 2; g2.ammo.cycle = 1e6;
+    step(g2, 0.5);
+    assert.ok(e.hp < e.max, id + ' deals damage while fed');
+    step(g2, 4);
+    assert.equal(g2.ammo.pile, 0, id + ' used the pile');
+    const hp = e.hp;
+    step(g2, 1);
+    assert.equal(e.hp, hp, id + ' idles when dry');
+    assert.ok(g2.heroes[0].dry);
   }
-  assert.equal(g.reserve.length, 0);
+});
+
+test('Overdrive loads bullets onto the pile', () => {
+  const g = fresh(['vanguard'], { deploy: 'all' });
+  g.ammo.pile = 0; g.ammo.cycle = 1e6; g.heroes[0].ab.cd = 0;
+  g.spawnEnemy('grunt', 180, { y: 250 });
+  assert.ok(g.useAbility(0));
+  assert.equal(g.ammo.pile, 6);
+});
+
+test('starved squads see more revolver upgrade cards', () => {
+  const rng = (seed) => new RNG(seed);
+  const count = (pressure) => {
+    let n = 0;
+    for (let i = 0; i < 300; i++) if (rollUpgrades(rng(i), { owned: {}, squadTags: new Set(['rapid']), enemyTags: new Set(), wave: 3, baseFrac: 1, ammoPressure: pressure }).includes('slicer_chambers')) n++;
+    return n;
+  };
+  assert.ok(count(1) > count(0) * 2, `${count(1)} vs ${count(0)}`);
+});
+
+// ---------------------------------------------------------------- stage structure and difficulty curve
+test('every stage has 12 rounds and the boss only appears in the last', () => {
+  for (const st of STAGES) {
+    const waves = buildWaves(st);
+    assert.equal(waves.length, 12, st.id);
+    assert.equal(WAVES_PER_STAGE, 12);
+    waves.forEach((groups, k) => assert.equal(groups.some((x) => x.boss), !!st.boss && k === 11, `${st.id} wave ${k}`));
+  }
+});
+
+test('difficulty rises smoothly: round pressure is monotonic and round enemy-hit-points grow within a stage', () => {
+  for (let k = 1; k < 12; k++) assert.ok(waveCurve(k) > waveCurve(k - 1));
+  assert.ok(waveCurve(11) / waveCurve(0) > 8, 'a real climb from the opening to the finale');
+  const hpOf = (st, k) => buildWaves(st)[k].reduce((a, g) => a + (g.e ? g.n * ENEMY_HP[g.e] : 0), 0);
+  for (const st of [STAGE_BY_ID['1-2'], STAGE_BY_ID['2-3'], STAGE_BY_ID['3-3']]) {
+    let early = 0, late = 0;
+    for (let k = 0; k < 4; k++) early += hpOf(st, k);
+    for (let k = 8; k < 12; k++) late += hpOf(st, k);
+    assert.ok(late > early * 3, `${st.id}: late rounds (${Math.round(late)}) should dwarf early rounds (${Math.round(early)})`);
+  }
 });

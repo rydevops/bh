@@ -93,6 +93,8 @@ export class AudioEngine {
     switch (e.type) {
       case 'shoot': this.sfx('shoot_' + (e.kind === 'drone' ? 'drone' : e.kind === 'rocket' ? 'rocket' : e.kind === 'sniper' ? 'sniper' : 'rifle')); break;
       case 'turretShot': this.sfx('shoot_turret'); break;
+      case 'slice': this.sfx('slice'); break;
+      case 'recycle': this.sfx('recycle'); break;
       case 'hit': if (e.crit) this.sfx('crit'); else if (!e.tick) this.sfx('hit'); break;
       case 'explosion': this.sfx(e.big ? 'explosion_big' : 'explosion'); if (e.big) this.duck(0.35, 0.3); break;
       case 'kill': this.sfx(e.boss ? 'boss_die' : 'kill'); if (e.boss) this.duck(0.7, 1.2); break;
@@ -200,6 +202,8 @@ export const SFX = {
   exposed: { gap: 0.3, play(e, c, t) { osc(c, 'sine', 600, 1200, t, 0.3, 0.1, e.sfxBus); osc(c, 'sine', 900, 1800, t + 0.08, 0.3, 0.08, e.sfxBus); } },
   shield: { gap: 0.2, play(e, c, t) { osc(c, 'triangle', 300, 900, t, 0.4, 0.1, e.sfxBus); } },
   phase: { gap: 0.5, play(e, c, t) { osc(c, 'sawtooth', 60, 480, t, 1.4, 0.16, e.sfxBus, 0.1); noise(e, c, 'bandpass', 300, 4000, t, 1.4, 0.16, e.sfxBus, 0.6); osc(c, 'sine', 80, 30, t + 1.3, 0.7, 0.3, e.sfxBus); } },
+  slice: { gap: 0.16, play(e, c, t) { noise(e, c, 'highpass', 4500, 9000, t, 0.05, 0.07, e.sfxBus, 2); osc(c, 'triangle', 1900, 1400, t, 0.05, 0.035, e.sfxBus); osc(c, 'square', 300, 180, t + 0.03, 0.04, 0.02, e.sfxBus); } },
+  recycle: { gap: 0.05, play(e, c, t) { osc(c, 'sine', 1500, 2300, t, 0.07, 0.06, e.sfxBus); } },
   summon: { gap: 0.3, play(e, c, t) { noise(e, c, 'bandpass', 300, 5000, t, 0.7, 0.2, e.sfxBus, 0.6); [48, 55, 60, 67, 72, 79].forEach((n, i) => osc(c, 'sawtooth', midi(n), midi(n + 12), t + i * 0.06, 0.55, 0.07, e.sfxBus, 0.02)); osc(c, 'sine', 90, 35, t + 0.35, 0.45, 0.3, e.sfxBus); } },
   upgrade_open: { gap: 0.2, play(e, c, t) { [60, 67, 72].forEach((n, i) => osc(c, 'triangle', midi(n), midi(n), t + i * 0.07, 0.25, 0.08, e.sfxBus)); } },
   upgrade_pick: { gap: 0.1, play(e, c, t) { [60, 64, 67, 72, 76].forEach((n, i) => osc(c, 'square', midi(n), midi(n), t + i * 0.055, 0.2, 0.06, e.sfxBus)); } },

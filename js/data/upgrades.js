@@ -18,6 +18,7 @@ export function defaultMods() {
     splashR: 0, splashFrac: 0, armorPierce: 0, haste: 0, burn: 0, frost: 0,
     turrets: 0, turretDmg: 0, turretRate: 0, focus: 0, homing: 0,
     reduce: 0, hpMult: 0, regen: 0, coin: 0, cut: 0, rerolls: 0,
+    slicer: 0, cycle: 0, pile: 0, // revolver: extra bullets per cut, cycle speed-up, pile capacity
     abilityPower: 0, abilityTargets: 0,
   };
 }
@@ -109,10 +110,28 @@ export const UPGRADES = {
     perLevel: (m) => { m.speed += 0.2; m.dmg += 0.06; },
   },
   extended_mag: {
-    id: 'extended_mag', name: 'Extended Magazine', cat: 'ammo', rarity: 'rare', max: 2, icon: 'magazine',
+    id: 'extended_mag', name: 'Multi-Shot', cat: 'ammo', rarity: 'rare', max: 4, icon: 'magazine',
     tags: ['rapid', 'ballistic', 'explosive'], counters: ['swarm'],
-    text: (l) => `+${l} extra projectile per volley (each at 60% damage)`,
+    text: (l) => `Each shot fires ${1 + l} bullets (max 5). Extra bullets deal 75% damage and use more ammo`,
     perLevel: (m) => { m.proj += 1; },
+  },
+  slicer_chambers: {
+    id: 'slicer_chambers', name: 'Slicer Chambers', cat: 'ammo', rarity: 'rare', max: 5, icon: 'revolver',
+    tags: ['ammo', 'support'], counters: [],
+    text: (l) => `The revolver slices ${1 + l} bullets per cycle (max 6)`,
+    perLevel: (m) => { m.slicer += 1; },
+  },
+  quick_slicer: {
+    id: 'quick_slicer', name: 'Quick Slicer', cat: 'ammo', rarity: 'common', max: 3, icon: 'bolt',
+    tags: ['ammo', 'rapid'], counters: [],
+    text: (l) => `Slicer cycle ${Math.round(l * 15)}% faster${l > 1 ? ' (15% each)' : ''}`,
+    perLevel: (m) => { m.cycle += 0.15; },
+  },
+  deep_pile: {
+    id: 'deep_pile', name: 'Deep Pile', cat: 'ammo', rarity: 'common', max: 3, icon: 'bullet',
+    tags: ['ammo', 'support'], counters: [],
+    text: (l) => `The ammo pile holds ${8 * l} more bullets`,
+    perLevel: (m) => { m.pile += 8; },
   },
   armor_piercing: {
     id: 'armor_piercing', name: 'Armor-Piercing Rounds', cat: 'ammo', rarity: 'rare', max: 3, icon: 'drill',
@@ -203,7 +222,7 @@ export function modsFromUpgrades(owned) {
  * Weighted choice of `n` distinct upgrades (GDD 7.5). Weight inputs:
  * rarity, squad tag synergy, previously chosen tags, enemy composition, level caps and prerequisites.
  */
-export function rollUpgrades(rng, { owned, squadTags, enemyTags, wave, baseFrac, n = 3, exclude = [] }) {
+export function rollUpgrades(rng, { owned, squadTags, enemyTags, wave, baseFrac, n = 3, exclude = [], ammoPressure = 0 }) {
   const ownedTags = new Map();
   for (const id in owned) for (const t of UPGRADES[id].tags) ownedTags.set(t, (ownedTags.get(t) || 0) + 1);
   const rarityBoost = 1 + Math.min(wave, 8) * 0.06; // later checkpoints skew toward rarer cards
@@ -222,6 +241,9 @@ export function rollUpgrades(rng, { owned, squadTags, enemyTags, wave, baseFrac,
     for (const t of u.counters) if (enemyTags.has(t)) w *= 1.3;
     if (lv > 0) w *= 1.15; // gentle commitment bias so builds can form
     if (id === 'field_repair') w *= baseFrac > 0.85 ? 0.1 : baseFrac < 0.5 ? 3 : 1;
+    // When the squad is burning ammo faster than the revolver makes it, the revolver cards surface.
+    if (id === 'slicer_chambers') w *= 1 + ammoPressure * 6;
+    if (id === 'quick_slicer' || id === 'deep_pile') w *= 1 + ammoPressure * 2;
     if (id === 'aux_turret' && lv === 0) w *= 1.5; // a visible, fun milestone early
     pool.push({ id, w });
   }

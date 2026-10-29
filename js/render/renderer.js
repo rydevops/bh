@@ -13,13 +13,17 @@ const MAX_PARTS = 520;
 const MAX_NUMS = 40;
 
 export const TRAY_CSS = 128; // px reserved at the bottom for ability buttons / cut meter
+export const STRIP = 62; // world px between the heroes' feet and the tray: the revolver / ammo pile strip
+/** Where ammo is drawn, in world coordinates. */
+export const REV = { cx: 58, pileX: 218 };
+export const stripY = (g) => g.heroY + 66;
 
 /** World layout for a given viewport: wall + hero row sit above the bottom tray. */
 export function layoutFor(cssW, cssH, safeBottom = 0) {
   const k = cssW / W;
   const H = cssH / k;
   const tray = (TRAY_CSS + safeBottom) / k;
-  const heroY = H - tray - 34;
+  const heroY = H - tray - 34 - STRIP;
   return { H, wallY: heroY - 56, heroY, k };
 }
 
@@ -106,6 +110,33 @@ export class Renderer {
           const col = this.trailColor(c, 0);
           this.burst(e.x, e.y - 2, e.kind === 'rocket' ? 5 : 2, 90, 0.18, 1.8, col, 'spark');
           this.spawn('dot', e.x, e.y - 2, 0, -30, 0.08, e.kind === 'rocket' ? 7 : 4, '#fff');
+          break;
+        }
+        case 'slice': {
+          const ry = stripY(g), n = Math.min(e.n, 6);
+          this.burst(REV.cx + 30, ry - 6, 5, 150, 0.2, 1.8, '#fff6c8');
+          for (let k = 0; k < n; k++) {
+            const life = 0.28 + k * 0.03;
+            const tx = REV.pileX + this.rng.range(-26, 26), ty = ry - 6;
+            this.spawn('shell', REV.cx + 36, ry + 4, (tx - REV.cx - 36) / life, (ty - ry - 4) / life, life, 1, '#e0a93a');
+          }
+          break;
+        }
+        case 'pull': {
+          const h = g.hero(e.i);
+          if (!h) break;
+          const ry = stripY(g);
+          for (let k = 0; k < Math.min(e.n, 3); k++) {
+            const life = 0.2 + k * 0.03;
+            const sx = REV.pileX + this.rng.range(-20, 20);
+            this.spawn('shell', sx, ry - 10, (h.x - sx) / life, (h.y + 14 - ry + 10) / life, life, 1, '#ffd96a');
+          }
+          break;
+        }
+        case 'recycle': {
+          const ry = stripY(g), life = 0.55;
+          this.spawn('ring', e.x, e.y, 0, 0, 0.25, 3, '#ffd96a', { grow: 34 });
+          this.spawn('shell', e.x, e.y, (REV.pileX - e.x) / life, (ry - 8 - e.y) / life, life, 1, '#ffd96a');
           break;
         }
         case 'turretShot': this.spawn('dot', e.x, e.y, 0, -20, 0.07, 3.5, '#ffe27a'); break;
@@ -200,6 +231,7 @@ export class Renderer {
     this.drawZones(ctx, g);
     this.drawTelegraphs(ctx, g);
     this.drawWall(ctx, g);
+    this.drawRevolver(ctx, g);
     this.drawTurrets(ctx, g);
     this.drawEnemies(ctx, g);
     this.drawHeroes(ctx, g);
@@ -299,6 +331,80 @@ export class Renderer {
       ctx.strokeStyle = `rgba(190,255,230,${0.5 + 0.3 * Math.sin(this.t * 8)})`; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(0, y - 52); for (let x = 0; x <= W; x += 20) ctx.lineTo(x, y - 52 + Math.sin(x * 0.05 + this.t * 3) * 3); ctx.stroke();
     }
+  }
+
+  /** The revolver (slicer cuts bullets from the cylinder) and the pile heroes draw ammo from. */
+  drawRevolver(ctx, g) {
+    const a = g.ammo, ry = stripY(g), cx = REV.cx, px = REV.pileX;
+    // backing tray
+    ctx.fillStyle = 'rgba(4,7,18,.55)';
+    ctx.beginPath(); ctx.roundRect(8, ry - 28, W - 16, 56, 14); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,150,230,.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+    // chute from the slicer to the pile
+    ctx.fillStyle = '#4a5370'; ctx.strokeStyle = '#10131f'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(cx + 26, ry + 4); ctx.lineTo(px - 52, ry + 20); ctx.lineTo(px - 52, ry + 25); ctx.lineTo(cx + 26, ry + 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    // --- cylinder: 6 chambers; the unlocked ones (slicer upgrades) are loaded, the rest are dim
+    const ease = (t) => t * t * (3 - 2 * t);
+    const full = a.pile >= a.cap;
+    const rot = (a.rotN + (full ? 0 : ease(Math.min(1, a.t / a.cycle)))) * (Math.PI / 3);
+    ctx.save(); ctx.translate(cx, ry);
+    const body = ctx.createRadialGradient(-6, -6, 3, 0, 0, 25);
+    body.addColorStop(0, '#9aa6c4'); body.addColorStop(1, '#4a5370');
+    ctx.fillStyle = body; ctx.strokeStyle = '#10131f'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, 24, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.rotate(rot);
+    for (let i = 0; i < 6; i++) {
+      const ang = (i * Math.PI) / 3;
+      const x = Math.cos(ang) * 14.5, y = Math.sin(ang) * 14.5;
+      const live = i < a.perCycle;
+      ctx.fillStyle = '#151a2c'; ctx.strokeStyle = live ? '#d8b14a' : '#10131f'; ctx.lineWidth = live ? 1.5 : 1;
+      ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fill(); ctx.stroke();
+      if (live) { ctx.fillStyle = '#e0a93a'; ctx.beginPath(); ctx.arc(x, y, 4.2, 0, 7); ctx.fill(); ctx.fillStyle = '#fff2b0'; ctx.beginPath(); ctx.arc(x - 1.2, y - 1.2, 1.4, 0, 7); ctx.fill(); }
+      else { ctx.strokeStyle = 'rgba(90,100,140,.8)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x - 2, y - 2); ctx.lineTo(x + 2, y + 2); ctx.moveTo(x + 2, y - 2); ctx.lineTo(x - 2, y + 2); ctx.stroke(); }
+    }
+    ctx.rotate(-rot);
+    ctx.fillStyle = '#2b3350'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    // --- slicer blade (swings down at the end of each cycle)
+    const prog = Math.min(1, a.t / a.cycle);
+    const sw = a.sliceFlash > 0 ? 1 - a.sliceFlash / 0.18 : prog > 0.78 ? (prog - 0.78) / 0.22 : 0;
+    const ang = -0.9 + 1.5 * (a.sliceFlash > 0 ? 1 - sw * 0.6 : sw);
+    ctx.save(); ctx.translate(cx + 30, ry - 20); ctx.rotate(ang);
+    ctx.fillStyle = '#dfe6f7'; ctx.strokeStyle = '#10131f'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(30, 1); ctx.lineTo(0, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#5a6382'; ctx.beginPath(); ctx.arc(0, 1, 3, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    if (a.sliceFlash > 0) {
+      ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = '#fff6c8'; ctx.globalAlpha = a.sliceFlash / 0.18; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(cx + 22, ry - 14); ctx.lineTo(cx + 44, ry + 6); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // --- the pile: a heap of brass shells (one per bullet, up to what fits), plus the count
+    const count = Math.floor(a.pile), shown = Math.min(count, 36);
+    let idx = 0;
+    for (let row = 0, per = 12; idx < shown && per > 0; row++, per--) {
+      for (let c = 0; c < per && idx < shown; c++, idx++) {
+        const x = px - ((per - 1) * 6) / 2 + c * 6 + ((idx * 7) % 3) * 0.4;
+        const y = ry + 21 - row * 7;
+        ctx.fillStyle = '#e0a93a'; ctx.strokeStyle = '#3a2a08'; ctx.lineWidth = 0.9;
+        ctx.beginPath(); ctx.roundRect(x - 2.2, y - 6, 4.4, 8, 1.6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#b87c22'; ctx.fillRect(x - 2.2, y - 0.5, 4.4, 2);
+        ctx.fillStyle = '#fff2b0'; ctx.fillRect(x - 1.2, y - 5, 1, 4);
+      }
+    }
+    const starving = a.starve > 0.4 && count < 2;
+    ctx.textAlign = 'left'; ctx.font = '900 12px system-ui, sans-serif';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(8,10,22,.9)';
+    const label = starving ? 'EMPTY' : `${count}/${a.cap}`;
+    ctx.globalAlpha = starving && !this.settings.reduceFlash ? 0.65 + 0.35 * Math.sin(this.t * 12) : 1;
+    ctx.strokeText(label, px + 46, ry + 4); ctx.fillStyle = starving ? '#ff7a6a' : '#ffe9a0'; ctx.fillText(label, px + 46, ry + 4);
+    ctx.globalAlpha = 1;
+    ctx.font = '800 9px system-ui, sans-serif'; ctx.fillStyle = 'rgba(190,205,255,.75)';
+    ctx.fillText(`${a.perCycle} PER CUT`, px + 46, ry + 17);
+    ctx.textAlign = 'center';
   }
 
   drawTurrets(ctx, g) {
@@ -407,6 +513,12 @@ export class Renderer {
           ctx.fillStyle = '#ffe14f';
           this.star(ctx, h.x + Math.cos(a) * 14, h.y - 38 + Math.sin(a) * 4, 3.2);
         }
+      }
+      if (h.dry && !dis) { // waiting on the revolver
+        ctx.globalAlpha = 0.6 + 0.4 * Math.sin(this.t * 10);
+        ctx.fillStyle = '#ff5a4a'; ctx.beginPath(); ctx.roundRect(h.x - 4, h.y - 52, 8, 14, 3); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillRect(h.x - 1, h.y - 49, 2, 5); ctx.fillRect(h.x - 1, h.y - 42, 2, 2);
+        ctx.globalAlpha = 1;
       }
       if (h.def.kind === 'drone') {
         const m = g.muzzle(h);
@@ -565,6 +677,14 @@ export class Renderer {
           ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = f * 0.8;
           ctx.fillStyle = f > 0.6 ? '#fff0a0' : f > 0.3 ? '#ffa030' : '#d03a10';
           ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.4 + f * 0.8), 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; break;
+        }
+        case 'shell': {
+          ctx.globalAlpha = 1;
+          ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(Math.atan2(p.vy, p.vx) + Math.PI / 2);
+          ctx.fillStyle = p.color; ctx.strokeStyle = '#3a2a08'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.roundRect(-1.8, -4, 3.6, 8, 1.4); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#fff6c8'; ctx.fillRect(-0.8, -3, 1, 4);
+          ctx.restore(); break;
         }
         case 'shard':
           ctx.globalAlpha = f; ctx.fillStyle = p.color; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + p.life * 8);

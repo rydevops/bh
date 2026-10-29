@@ -17,8 +17,10 @@ Locally: `npm run serve` → <http://localhost:8080>
 
 ### How to play
 
-- Every battle starts with **just your lead hero** (squad slot 1). After each wave a gold **Summon** card lets you call the next squad member into the fight - alongside normal upgrades - so your squad assembles as the battle goes on. You choose the order in the Squad screen.
-- Your heroes defend a wall at the bottom of the screen and **fire automatically**.
+- Every stage is **12 rounds**, and the opening rounds are gentle: each battle starts with **just your lead hero** (squad slot 1). After a round, the reward cards may include a gold **Summon** card that calls the next squad member into the fight. It is **random** (50% per reward round) but you never go two reward rounds in a row without one. You choose the join order in the Squad screen.
+- **Ammo / the revolver:** heroes don't have unlimited bullets. A revolver's **slicer** cuts bullets from its cylinder into the **ammo pile** (bottom of the screen), and every hero shot takes bullets from that pile. If the pile runs dry, heroes **wait for the slicer**. It starts at **1 bullet per cut**; *Slicer Chambers* upgrades raise this up to **6**, *Quick Slicer* speeds the cycle and *Deep Pile* raises capacity. Each hero fires **one bullet per shot** by default, up to **5** with *Multi-Shot* upgrades (each extra bullet costs ammo). Cutting enemy bullets with a swipe **recycles them into the pile**.
+- **2× speed** is locked until you have cleared that stage once.
+- Heroes defend a wall at the bottom of the screen and **fire automatically** (as long as there is ammo).
 - **Swipe across enemy bullets to cut them** out of the air (limited by the CUT meter). Heavy bombs need several cuts.
 - **Tap a hero portrait** (or keys `1`–`4`) to use their ability. Cutting bullets charges abilities.
 - After each wave, **pick 1 of 3 upgrades** (skills, firepower, ammunition, defense, utility). Upgrades last for the run.
@@ -57,7 +59,7 @@ Requires Node 22+. No dependencies, no bundler — the game is plain ES modules.
 | Command | What it does |
 | --- | --- |
 | `npm run serve` | Static server on :8080 |
-| `npm test` | 46 unit/integration tests (simulation, economy, saves, PWA invariants) |
+| `npm test` | 56 unit/integration tests (simulation, economy, saves, PWA invariants) |
 | `npm run e2e` | Real-browser tests: every screen, summon flow, settings and reset, and the auto-update flow (needs Playwright) |
 | `npm run balance` | Headless bot plays every stage and prints win rates (`LVMUL=0.7 npm run balance` to test under-levelled squads) |
 | `npm run stamp` | Re-stamp `sw.js`, `js/version.js`, `version.json` (run after changing shipped files) |
@@ -84,7 +86,9 @@ tests/         node:test suites
 | --- | --- |
 | §3 loop, §4 combat | Auto-targeting (closest to wall, overkill avoidance, stable retargeting), pooled projectiles with pierce/splash/crit/elements, formula `Attack × Skill × Crit × Resistance`, shields + armor + armor-piercing, pause on interruption, checkpoint/resume |
 | §4.4 bullet cutting | Swipe-to-cut enemy projectiles with a regenerating CUT meter; bombs need multiple cuts. *(The GDD asks that the exact mechanic be verified against the reference game — this is one of its listed alternatives.)* |
-| §3/§5 summon format | Battles deploy only the lead hero; the rest of the squad is summoned by reward cards (a Summon card is always on offer until the squad is complete). Wave sizes follow a reinforcement ramp (`REINFORCE_RAMP`) so early waves suit the heroes actually on the field |
+| §3/§5 summon format | Battles deploy only the lead hero; the rest of the squad is summoned by *random* reward cards (50% per reward round, with a pity rule: never two rounds in a row without one) |
+| §7.3 ammunition model | Revolver + slicer + ammo pile (see How to play): shared limited ammo, 1→6 bullets per cut via upgrades, 1→5 bullets per shot via upgrades |
+| §9 stage structure | 12 rounds per stage. Each round's enemy budget is derived from the damage a typical player's hero can deal in that round's time window × a smooth round curve × a gentle stage ramp (`buildWaves`, `TUNE` in `js/data/enemies.js`), so counts stay sane while enemy health scales |
 | §5 heroes | Vanguard, Rook, Pulse, Patch from the GDD **+ Specter and Ember** (6 total), each with an active ability, passive, 4 rank perks, skins; 3 squad slots → 4 after stage 2-2; no duplicates; saved presets; strengths/gaps analysis |
 | §6 enemies | Grunt, Runner, Bulwark, Sentinel (+ Spitter, Drone, Splitter, Slimeling = 8 archetypes) and 3 world bosses with phases, telegraphs and vulnerability windows; `Health(stage) = Base × (1 + α·stage)` |
 | §7 upgrades | 27 in-run cards across skill / firepower / ammunition / defense / utility, weighted by squad tags, owned tags, enemy mix, rarity and caps; rerolls |
