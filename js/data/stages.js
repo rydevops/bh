@@ -122,9 +122,12 @@ export function buildWaves(stage, { hard = false } = {}) {
     // when enemy health scales steeply, and difficulty rises smoothly from round to round and stage to stage.
     const solo = heroDps('vanguard', expectedLevel(stage.idx), expectedRank(stage.idx));
     const hpMul = statScale(stage.idx, k, hard).hp * (stage.mod === 'swarm' ? 0.8 : 1);
-    const pressure = TUNE.pressure * (1 + TUNE.pressureIdx * stage.idx);
+    // Early stages ease in: with one-bullet-per-shot ammo, big waves of fragile enemies are ammo-limited, not damage-limited.
+    const ease = 1 - TUNE.earlyEase * Math.max(0, 1 - stage.idx / 6);
+    const pressure = TUNE.pressure * (1 + TUNE.pressureIdx * stage.idx) * ease;
     const budget = ((solo * span) / (ENEMIES.grunt.hp * hpMul)) * waveCurve(k) * pressure * swarm * (last && stage.boss ? 0.6 : 1);
-    const introAt = (p) => Math.round(p.from * 2.2); // tiers 0..3 spread over the 12 rounds
+    // Intro tiers 0..3 spread over the 12 rounds; the heaviest enemy (Bulwark) debuts two rounds later than its tier.
+    const introAt = (p) => Math.round(p.from * 2.2) + (COST[p.e] >= 9 ? 2 : 0);
     const avail = stage.pool.filter((p) => introAt(p) <= k);
     const wsum = avail.reduce((a, p) => a + p.w, 0);
     avail.forEach((p, i) => {

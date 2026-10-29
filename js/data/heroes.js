@@ -45,7 +45,7 @@ export const HEROES = {
     weapon: 'Automatic rifle',
     kind: 'rifle',
     tags: ['rapid', 'ballistic', 'single'],
-    base: { atk: 18, interval: 0.36, range: 440, speed: 560, crit: 0.05, critMult: 1.8, pierce: 0, splash: 0, spread: 0.05 },
+    base: { atk: 60, interval: 1.2, range: 440, speed: 560, crit: 0.05, critMult: 1.8, pierce: 0, splash: 0, spread: 0.05 },
     ability: {
       name: 'Overdrive',
       cd: 18,
@@ -95,7 +95,7 @@ export const HEROES = {
     weapon: 'Support drone',
     kind: 'drone',
     tags: ['support', 'defense', 'drone'],
-    base: { atk: 10, interval: 0.7, range: 340, speed: 420, crit: 0.05, critMult: 1.8, pierce: 0, splash: 0, spread: 0.02 },
+    base: { atk: 20, interval: 1.4, range: 340, speed: 420, crit: 0.05, critMult: 1.8, pierce: 0, splash: 0, spread: 0.02 },
     ability: {
       name: 'Emergency Barrier',
       cd: 22,
@@ -120,7 +120,8 @@ export const HEROES = {
     weapon: 'Focused beam',
     kind: 'beam',
     tags: ['energy', 'beam', 'pierce', 'shield'],
-    base: { atk: 5, interval: 0.1, range: 380, speed: 0, crit: 0.05, critMult: 1.8, pierce: 99, splash: 0, spread: 0, ammoRate: 1.25 },
+    // Beam fires in bursts: `burst` seconds of ticks (every 0.1s, `atk` each), then a reload of `interval`.
+    base: { atk: 16, interval: 1.6, burst: 0.5, volley: 5, range: 380, speed: 0, crit: 0.05, critMult: 1.8, pierce: 99, splash: 0, spread: 0 },
     ability: {
       name: 'Sustained Beam',
       cd: 20,
@@ -170,7 +171,7 @@ export const HEROES = {
     weapon: 'Flamethrower',
     kind: 'flame',
     tags: ['fire', 'area', 'close', 'burn'],
-    base: { atk: 4.5, interval: 0.1, range: 215, speed: 0, crit: 0.05, critMult: 1.8, pierce: 99, splash: 0, spread: 0, ammoRate: 1.25 },
+    base: { atk: 9.3, interval: 1.4, burst: 0.6, volley: 6, range: 215, speed: 0, crit: 0.05, critMult: 1.8, pierce: 99, splash: 0, spread: 0 },
     ability: {
       name: 'Firestorm',
       cd: 17,

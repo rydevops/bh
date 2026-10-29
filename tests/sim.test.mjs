@@ -149,9 +149,9 @@ test('enemy bullets that reach the wall damage it; barrier absorbs first', () =>
 });
 
 test('upgrades produce their documented effects', () => {
-  const m = modsFromUpgrades({ heavy_rounds: 2, quick_trigger: 3, phase_rounds: 1, energy_shield: 2 });
+  const m = modsFromUpgrades({ heavy_rounds: 2, quick_reload: 2, phase_rounds: 1, energy_shield: 2 });
   assert.ok(Math.abs(m.dmg - 0.36) < 1e-9);
-  assert.ok(Math.abs(m.rate - 0.3) < 1e-9);
+  assert.ok(Math.abs(m.reload - 0.4) < 1e-9);
   assert.equal(m.pierce, 1);
   assert.ok(Math.abs(m.reduce - 0.16) < 1e-9);
   const g = mk();
@@ -166,7 +166,7 @@ test('upgrades produce their documented effects', () => {
 test('upgrade rolls: three distinct, respect caps and prerequisites', () => {
   const rng = new RNG(5);
   for (let i = 0; i < 200; i++) {
-    const owned = i % 2 ? { heavy_rounds: 6, quick_trigger: 5 } : {};
+    const owned = i % 2 ? { heavy_rounds: 6, quick_reload: 2 } : {};
     const picks = rollUpgrades(rng, { owned, squadTags: new Set(['rapid']), enemyTags: new Set(['armored']), wave: i % 6, baseFrac: 0.7 });
     assert.equal(picks.length, 3);
     assert.equal(new Set(picks).size, 3);
@@ -303,70 +303,88 @@ const lone = (extra = {}) => {
   const dummy = g.spawnEnemy('grunt', 10, { y: -500 }); dummy.speed = 0; dummy.hp = dummy.max = 1e12;
   return g;
 };
+const freezeHand = (g) => { g.ammo.rev = 1e9; g.ammo.revBase = 1e9; };
+const target = (g, y = 250) => { const e = g.spawnEnemy('grunt', 180, { y }); e.hp = e.max = 1e12; e.speed = 0; return e; };
 
-test('the revolver starts with one bullet per cut and a small pile', () => {
+test('the revolver starts with one loaded chamber, a 1.2s sweep and a small pile', () => {
   const g = lone();
-  assert.equal(g.ammo.perCycle, 1);
+  assert.equal(g.ammo.unlocked, 1);
   assert.equal(g.ammo.pile, 6);
-  assert.ok(Math.abs(g.ammo.cycle - 0.36) < 1e-9);
+  assert.equal(g.ammo.rev, 1.2);
 });
 
-test('the slicer cuts bullets into the pile each cycle, up to the pile capacity', () => {
+test('the slicer hand adds a bullet each time it passes a loaded chamber (one per sweep with one loaded)', () => {
   const g = lone();
   g.ammo.pile = 0;
-  step(g, 3.6); // ten cycles
-  assert.ok(g.ammo.pile >= 9 && g.ammo.pile <= 10, 'about 1 per cycle: ' + g.ammo.pile);
-  step(g, 20);
+  step(g, 6); // five sweeps
+  assert.ok(g.ammo.pile >= 4 && g.ammo.pile <= 6, 'about 1 per sweep: ' + g.ammo.pile);
+  step(g, 30);
   assert.equal(g.ammo.pile, g.ammo.cap, 'never overfills');
 });
 
-test('each hero shot takes one bullet from the pile; a dry pile makes the hero wait for the slicer', () => {
-  const g = lone();
-  g.spawnEnemy('grunt', 180, { y: 250 }).hp = 1e9;
-  g.ammo.pile = 3; g.ammo.cycleBase = 1e6; g.ammo.cycle = 1e6; // freeze the revolver
+test('every loaded chamber the hand passes yields exactly one bullet per sweep, locked chambers none', () => {
+  for (let k = 1; k <= 6; k++) {
+    const g = lone();
+    g.owned = { slicer_chambers: k - 1 }; g.recomputeMods(false);
+    assert.equal(g.ammo.unlocked, k);
+    g.ammo.pile = 0; g.ammo.cap = 1000;
+    const slots = new Set();
+    g.emit = true;
+    step(g, 1.2 * 3);
+    for (const e of g.events) if (e.type === 'slice') slots.add(e.slot);
+    assert.ok(g.ammo.pile >= 3 * k - 1 && g.ammo.pile <= 3 * k + 1, `${k} loaded -> ~${3 * k} bullets in 3 sweeps, got ${g.ammo.pile}`);
+    assert.equal(slots.size, k, 'only the loaded chambers fire');
+    if (k === 2) assert.deepEqual([...slots].sort(), [0, 3], 'the second chamber sits opposite the first');
+  }
+});
+
+test('each hero shot takes one bullet from the pile; a dry pile makes the hero wait for the slicer hand', () => {
+  const g = lone(); target(g);
+  g.ammo.pile = 3; freezeHand(g);
   g.heroes[0].cd = 0;
-  step(g, 3);
+  step(g, 8); // three shots at 1.2s reload would take 3.6s
   assert.equal(g.ammo.pile, 0, 'three bullets spent');
   assert.equal(g.ammo.taken, 3);
   assert.ok(g.heroes[0].dry, 'hero is dry and waiting');
-  const shotsBefore = g.heroes[0].shots;
+  const shots = g.heroes[0].shots;
   step(g, 2);
-  assert.equal(g.heroes[0].shots, shotsBefore, 'no shots without ammo');
+  assert.equal(g.heroes[0].shots, shots, 'no shots without ammo');
   g.ammo.pile = 2; // the revolver delivers
   step(g, 1);
-  assert.ok(g.heroes[0].shots > shotsBefore, 'fires again once bullets arrive');
+  assert.ok(g.heroes[0].shots > shots, 'fires again once bullets arrive');
+  assert.equal(g.heroes[0].dry, false);
 });
 
-test('slicer upgrades: 1 -> 6 bullets per cut, faster cycle, deeper pile (capped)', () => {
+test('slicer upgrades: 1 -> 6 loaded chambers, faster hand, deeper pile (capped)', () => {
   const g = lone();
   g.owned = { slicer_chambers: 5, quick_slicer: 3, deep_pile: 3 }; g.recomputeMods(false);
-  assert.equal(g.ammo.perCycle, 6);
-  assert.ok(g.ammo.cycle < 0.36 * 0.6);
+  assert.equal(g.ammo.unlocked, 6);
+  assert.ok(g.ammo.rev < 1.2 * 0.6);
   assert.equal(g.ammo.cap, 12 + 24);
   g.owned = { slicer_chambers: 99 }; g.recomputeMods(false);
-  assert.equal(g.ammo.perCycle, 6, 'hard cap of six');
+  assert.equal(g.ammo.unlocked, 6, 'hard cap of six');
 });
 
 test('multi-shot: default one bullet per shot, up to five via upgrades, each costing ammo', () => {
-  const g = lone(); g.spawnEnemy('grunt', 180, { y: 260 }).hp = 1e9;
-  g.heroes[0].cd = 0; g.ammo.cycle = 1e6; g.ammo.pile = 20;
+  const g = lone(); target(g, 260);
+  g.heroes[0].cd = 0; freezeHand(g); g.ammo.pile = 20;
   step(g, 0.03);
   assert.equal(g.ammo.taken, 1, 'default: one bullet');
-  const g2 = lone(); g2.spawnEnemy('grunt', 180, { y: 260 }).hp = 1e9;
+  const g2 = lone(); target(g2, 260);
   g2.owned = { extended_mag: 4 }; g2.recomputeMods(false);
   assert.equal(g2.mods.proj, 4);
-  g2.heroes[0].cd = 0; g2.ammo.cycle = 1e6; g2.ammo.pile = 20;
+  g2.heroes[0].cd = 0; freezeHand(g2); g2.ammo.pile = 20;
   step(g2, 0.03);
   assert.equal(g2.ammo.taken, 5, 'max: five bullets from one shot');
-  const g3 = lone(); g3.spawnEnemy('grunt', 180, { y: 260 }).hp = 1e9;
+  const g3 = lone(); target(g3, 260);
   g3.owned = { extended_mag: 4 }; g3.recomputeMods(false);
-  g3.heroes[0].cd = 0; g3.ammo.cycle = 1e6; g3.ammo.pile = 2;
+  g3.heroes[0].cd = 0; freezeHand(g3); g3.ammo.pile = 2;
   step(g3, 0.03);
   assert.equal(g3.ammo.taken, 2, 'partial volley when the pile runs short');
 });
 
 test('cutting an enemy bullet recycles it onto the pile', () => {
-  const g = lone(); g.ammo.cycle = 1e6; g.ammo.pile = 2;
+  const g = lone(); freezeHand(g); g.ammo.pile = 2;
   g.spawnEnemyBullet(100, 200, 0, 50, 5, 5, 1, 'spit');
   g.spawnEnemyBullet(200, 200, 0, 50, 20, 14, 1, 'bomb');
   g.cutSegment(80, 200, 120, 200);
@@ -375,29 +393,79 @@ test('cutting an enemy bullet recycles it onto the pile', () => {
   assert.equal(g.ammo.pile, 5, 'a bomb is worth two');
 });
 
-test('beam and flame heroes burn ammo and stop when the pile is empty', () => {
+test('beam and flame heroes fire one burst per bullet, then reload; they idle when dry', () => {
   for (const id of ['pulse', 'ember']) {
-    const g2 = fresh([id], { deploy: 'all' });
-    g2.spawnQ.length = 0; g2.enemies.length = 0;
-    const e = g2.spawnEnemy('grunt', 180, { y: g2.wallY - 90 }); e.hp = e.max = 1e9;
-    g2.ammo.pile = 2; g2.ammo.cycle = 1e6;
-    step(g2, 0.5);
-    assert.ok(e.hp < e.max, id + ' deals damage while fed');
-    step(g2, 4);
-    assert.equal(g2.ammo.pile, 0, id + ' used the pile');
+    const g = fresh([id], { deploy: 'all' });
+    g.spawnQ.length = 0; g.enemies.length = 0;
+    const e = g.spawnEnemy('grunt', 180, { y: g.wallY - 90 }); e.hp = e.max = 1e12; e.speed = 0;
+    g.ammo.pile = 2; freezeHand(g);
+    g.heroes[0].cd = 0;
+    step(g, 0.3);
+    assert.equal(g.ammo.pile, 1, id + ': one bullet pulled at the start of the burst');
+    assert.ok(g.heroes[0].burstT > 0 && e.hp < e.max, id + ' is bursting and damaging');
+    step(g, 0.5); // 0.8s in: the burst (<=0.6s) is over but the reload (>=1.4s) is not
+    e.burnT = 0; e.burnDps = 0; // Ember's burn keeps ticking for 3s after the flames stop: ignore it here
     const hp = e.hp;
-    step(g2, 1);
-    assert.equal(e.hp, hp, id + ' idles when dry');
-    assert.ok(g2.heroes[0].dry);
+    assert.ok(g.heroes[0].burstT <= 0 && g.heroes[0].cd > 0, id + ' is reloading');
+    step(g, 0.3);
+    assert.equal(e.hp, hp, id + ' deals nothing while reloading');
+    step(g, 4);
+    assert.equal(g.ammo.pile, 0, id + ' used the second bullet after the reload');
+    step(g, 1.5); e.burnT = 0; e.burnDps = 0;
+    const hp2 = e.hp;
+    step(g, 3);
+    assert.equal(e.hp, hp2, id + ' idles when dry');
+    assert.ok(g.heroes[0].dry);
   }
+});
+
+test('burst heroes deal the same damage per second as before (volley x tick damage / reload)', async () => {
+  const { heroDps } = await import('../js/progression.js');
+  assert.ok(Math.abs(heroDps('pulse', 1, 1) - 52.5) < 4, 'pulse ~50 dps: ' + heroDps('pulse', 1, 1));
+  assert.ok(Math.abs(heroDps('ember', 1, 1) - 42) < 5, 'ember ~40 dps: ' + heroDps('ember', 1, 1));
+  assert.ok(Math.abs(heroDps('vanguard', 1, 1) - 52.5) < 4);
 });
 
 test('Overdrive loads bullets onto the pile', () => {
   const g = fresh(['vanguard'], { deploy: 'all' });
-  g.ammo.pile = 0; g.ammo.cycle = 1e6; g.heroes[0].ab.cd = 0;
+  g.ammo.pile = 0; freezeHand(g); g.heroes[0].ab.cd = 0;
   g.spawnEnemy('grunt', 180, { y: 250 });
   assert.ok(g.useAbility(0));
   assert.equal(g.ammo.pile, 6);
+});
+
+// ---------------------------------------------------------------- reload cooldowns
+test('every hero has a reload: the next shot cannot come sooner (Vanguard 1.2s) and the bar data tracks it', () => {
+  const g = lone(); target(g, 260);
+  const h = g.heroes[0];
+  g.ammo.pile = 50; freezeHand(g);
+  h.cd = 0;
+  step(g, 0.05);
+  assert.equal(h.shots, 1);
+  assert.ok(Math.abs(h.cdMax - 1.2) < 1e-9, 'bar length is the reload time');
+  assert.ok(h.cd > 1.0 && h.cd <= 1.2);
+  const t0 = g.t;
+  let t1 = null;
+  while (g.t - t0 < 3 && t1 === null) { g.update(1 / 60); if (h.shots === 2) t1 = g.t - t0; }
+  assert.ok(Math.abs(t1 - 1.15) < 0.12, 'second shot ~1.2s after the first: ' + t1);
+});
+
+test('Quick Reload: -20% reload per level, at most two levels (-40%)', () => {
+  const g = lone(); const h = g.heroes[0];
+  const base = g.reloadTime(h);
+  assert.ok(Math.abs(base - 1.2) < 1e-9);
+  g.owned = { quick_reload: 1 }; g.recomputeMods(false);
+  assert.ok(Math.abs(g.reloadTime(h) - base * 0.8) < 1e-9);
+  g.owned = { quick_reload: 2 }; g.recomputeMods(false);
+  assert.ok(Math.abs(g.reloadTime(h) - base * 0.6) < 1e-9);
+  assert.equal(UPGRADES.quick_reload.max, 2);
+});
+
+test('reload speed-ups stack with ability buffs and are reflected in the next bar length', () => {
+  const g = lone(); const h = g.heroes[0];
+  g.owned = { quick_reload: 2 }; g.recomputeMods(false);
+  h.buff.rate = 2; h.buff.rateT = 5; // Overdrive doubles fire rate
+  assert.ok(Math.abs(g.reloadTime(h) - 1.2 * 0.5 * 0.6) < 1e-9);
 });
 
 test('starved squads see more revolver upgrade cards', () => {

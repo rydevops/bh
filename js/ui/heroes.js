@@ -115,7 +115,7 @@ registerScreen('hero', ({ id }) => {
         h('div', { class: 'stat-grid' },
           stat('Weapon', d.weapon),
           stat('Attack', atk.toFixed(1)),
-          stat('Fire rate', (1 / d.base.interval).toFixed(1) + '/s'),
+          stat('Reload', d.base.interval.toFixed(1) + 's'),
           stat('Range', d.base.range),
           stat('Crit chance', Math.round(d.base.crit * 100) + '%'),
           stat('Crit damage', '×' + d.base.critMult),
