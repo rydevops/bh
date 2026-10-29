@@ -3,7 +3,7 @@
  * - A new release changes BUILD (and so this file's bytes) -> the browser installs the new worker,
  *   which fills a new cache, takes over immediately, and deletes older caches.
  * Stamped by tools/stamp.mjs - BUILD and PRECACHE are generated; do not edit by hand. */
-const BUILD = '7abe060f15ed';
+const BUILD = '7dd2c16401e6';
 const CACHE = 'bullet-heroes-' + BUILD;
 const PRECACHE = [
   './css/style.css',
