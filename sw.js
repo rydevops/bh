@@ -3,7 +3,7 @@
  * - A new release changes BUILD (and so this file's bytes) -> the browser installs the new worker,
  *   which fills a new cache, takes over immediately, and deletes older caches.
  * Stamped by tools/stamp.mjs - BUILD and PRECACHE are generated; do not edit by hand. */
-const BUILD = 'bf5d8a98d19f';
+const BUILD = 'aa5b0970c689';
 const CACHE = 'bullet-heroes-' + BUILD;
 const PRECACHE = [
   './css/style.css',
@@ -27,6 +27,7 @@ const PRECACHE = [
   './js/progression.js',
   './js/render/backgrounds.js',
   './js/render/renderer.js',
+  './js/render/scenery.js',
   './js/render/sprites.js',
   './js/render/titleScene.js',
   './js/save.js',

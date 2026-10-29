@@ -25,6 +25,7 @@ Locally: `npm run serve` → <http://localhost:8080>
 - Each hero fires **one bullet per shot** by default, up to **5** with *Multi-Shot* upgrades (each extra bullet costs ammo).
 - **2× speed** is locked until you have cleared that stage once.
 - The **title screen** is an animated diorama that cycles through the three worlds (drifting clouds, crows, patrolling drones, searchlights, floating spores) while your squad shoots at enemies marching toward the wall. It shows a single still frame if you enable *Reduce flashing* or your device asks for reduced motion.
+- The **battlefield uses the same living scenery as the title screen**: gradient sky, sun / planet / moon, drifting clouds, parallax skylines, crows, patrol drones with searchlights and glowing spores. Enemies march out of the horizon haze, and the HUD sits in the sky, clear of the status bar.
 - Heroes defend a wall at the bottom of the screen and **fire automatically** (as long as there is ammo).
 - **Swipe across enemy bullets to cut them** out of the air (limited by the CUT meter). Heavy bombs need several cuts.
 - **Tap a hero portrait** (or keys `1`–`4`) to use their ability. Cutting bullets charges abilities.

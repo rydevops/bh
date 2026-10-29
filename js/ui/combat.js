@@ -3,9 +3,9 @@
 import { h, clear } from './dom.js';
 import { icon } from './icons.js';
 import { Game, W } from '../sim/game.js';
-import { Renderer, layoutFor } from '../render/renderer.js';
+import { Renderer, layoutFor, skyTop } from '../render/renderer.js';
 import { heroPortrait } from '../render/sprites.js';
-import { STAGE_BY_ID, WORLDS } from '../data/stages.js';
+import { STAGE_BY_ID } from '../data/stages.js';
 import { RARITY } from '../data/heroes.js';
 import { UPGRADES, CATEGORY } from '../data/upgrades.js';
 import { applyRunResult } from '../economy.js';
@@ -65,7 +65,7 @@ export function startCombat(opts) {
   buildHud(s);
   renderer.onEvent = (e) => onEvent(s, e);
   // The status-bar strip matches the top row of this world's sky (see setEdgeColor).
-  renderer.onWorld = (w) => setEdgeColor(WORLDS[w].bg.mid);
+  renderer.onWorld = (w) => setEdgeColor(skyTop(w));
   bindInput(s);
   const world = stage ? stage.world : 0;
   playBattleMusic(s, false, world);
@@ -87,7 +87,7 @@ function frame(s, now) {
   if (session !== s) return;
   s.raf = requestAnimationFrame((t) => frame(s, t));
   const g = s.game;
-  const dt = Math.min(0.1, (now - s.last) / 1000);
+  const dt = Math.max(0, Math.min(0.1, (now - s.last) / 1000)); // the first rAF timestamp can precede `last`
   s.last = now;
   if (!s.paused) {
     s.acc += dt * s.speed;

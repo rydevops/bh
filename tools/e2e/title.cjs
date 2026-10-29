@@ -61,7 +61,7 @@ const path = require('path');
   if (e0.bg === 'rgb(8, 12, 28)') ok('on menu screens the strip is the flat app colour'); else fail('menu strip colour ' + e0.bg);
   await p.click('.nav >> text=Battle'); await p.click('button:has-text("Battle")'); await p.waitForSelector('.ab'); await p.waitForTimeout(1300);
   const e1 = await edge();
-  if (e1.bg === 'rgb(140, 74, 60)') ok('in combat the strip matches the top row of the world sky (' + e1.bg + ')'); else fail('combat strip colour ' + e1.bg);
+  if (e1.bg === 'rgb(106, 90, 168)') ok('in combat the strip matches the top row of the world sky (' + e1.bg + ')'); else fail('combat strip colour ' + e1.bg);
   await p.click('[aria-label="Pause"]'); await p.click('button:has-text("Quit")'); await p.locator('.sheet button:has-text("Quit")').last().click(); await p.waitForSelector('.res-title');
   await p.waitForTimeout(1000);
   const e2 = await edge();
