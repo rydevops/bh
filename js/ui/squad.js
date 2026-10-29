@@ -27,10 +27,13 @@ export function openSquad({ stage = null, onDone } = {}) {
       const id = squad[i];
       if (!id) { slotEls.push(h('div', { class: 'slot', 'aria-label': 'Empty slot' }, h('span', { class: 'muted' }, '+'))); continue; }
       const hero = p.heroes[id];
-      slotEls.push(h('button', {
-        class: 'slot filled', 'aria-label': `Remove ${HEROES[id].name}`,
-        onclick: () => { if (squad.length <= 1) { toast('A squad needs at least one hero', true); return; } store.update((pr) => setSquad(pr, pr.squad.filter((x) => x !== id))); render(); },
-      }, h('img', { src: heroPortrait(id, hero.skin, 80), alt: '' }), h('span', { class: 'nm' }, `${HEROES[id].name} · Lv${hero.lv}`)));
+      const remove = () => { if (squad.length <= 1) { toast('A squad needs at least one hero', true); return; } store.update((pr) => setSquad(pr, pr.squad.filter((x) => x !== id))); render(); };
+      const makeLead = () => { if (i === 0) return; store.update((pr) => setSquad(pr, [id, ...pr.squad.filter((x) => x !== id)])); render(); };
+      slotEls.push(h('div', { class: 'slot filled' + (i === 0 ? ' lead' : '') },
+        h('button', { class: 'slot-main', 'aria-label': i === 0 ? `${HEROES[id].name}, starts the battle` : `Make ${HEROES[id].name} the lead hero`, onclick: makeLead },
+          h('img', { src: heroPortrait(id, hero.skin, 80), alt: '' }), h('span', { class: 'nm' }, `${HEROES[id].name} · Lv${hero.lv}`)),
+        h('span', { class: 'lead-tag' + (i === 0 ? '' : ' alt') }, i === 0 ? 'START' : `JOIN ${i}`),
+        h('button', { class: 'slot-x', 'aria-label': `Remove ${HEROES[id].name}`, onclick: remove }, '×')));
     }
     const picks = HERO_ORDER.map((id) => {
       const def = HEROES[id], hero = p.heroes[id];
@@ -53,6 +56,7 @@ export function openSquad({ stage = null, onDone } = {}) {
       h('div', { class: 'row', style: { justifyContent: 'space-between', marginBottom: '8px' } },
         h('h3', { class: 'title' }, 'Your squad'),
         h('span', { class: 'power ' + (rec ? powerClass(power, rec) : 'ok'), html: `${icon('bolt')} ${fmtFull(power)}${rec ? ` <small class="muted">/ ${fmtFull(rec)} rec.</small>` : ''}` })),
+      h('p', { class: 'muted', style: { fontSize: '.78rem', margin: '0 0 8px' } }, 'The first hero starts every battle alone. The others are summoned by reward cards after each wave. Tap a hero to make them the lead.'),
       h('div', { class: 'slots' }, slotEls),
       h('div', { class: 'panel', style: { marginTop: '10px' } },
         h('div', { class: 'muted', style: { fontSize: '.72rem', fontWeight: 900, letterSpacing: '.08em', marginBottom: '4px' } }, 'SQUAD STRENGTHS & GAPS'),

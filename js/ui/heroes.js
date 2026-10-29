@@ -2,7 +2,7 @@
 
 import { h } from './dom.js';
 import { icon } from './icons.js';
-import { registerScreen, go, navBar, currencyChips, toast, confirmBox, refresh, sfx } from './app.js';
+import { registerScreen, go, navBar, currencyChips, topBar, gearButton, toast, confirmBox, refresh, sfx } from './app.js';
 import { store } from '../store.js';
 import { HEROES, HERO_ORDER, ROLES, RARITY, MAX_RANK, RANK_COST, levelCap, levelCost } from '../data/heroes.js';
 import { heroPortrait } from '../render/sprites.js';
@@ -35,7 +35,7 @@ registerScreen('heroes', () => {
           h('div', { class: 'sub' }, `${frags}/${need} fragments`)]);
   });
   const el = h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } },
-    h('div', { class: 'topbar' }, currencyChips(p)),
+    topBar(p),
     h('div', { class: 'scroll' },
       h('h2', { class: 'title', style: { marginBottom: '8px' } }, 'Heroes'),
       p.flags.heroMenu ? null : h('div', { class: 'banner-note', style: { marginBottom: '10px' } }, 'Finish your first battle to unlock hero upgrades.'),
@@ -98,7 +98,7 @@ registerScreen('hero', ({ id }) => {
     }))) : null;
 
   const el = h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } },
-    h('div', { class: 'head' }, h('button', { class: 'back', 'aria-label': 'Back', onclick: () => go('heroes'), html: icon('back') }), h('h2', { class: 'title' }, d.name), currencyChips(p)),
+    h('div', { class: 'head' }, h('button', { class: 'back', 'aria-label': 'Back', onclick: () => go('heroes'), html: icon('back') }), h('h2', { class: 'title' }, d.name), currencyChips(p), gearButton()),
     h('div', { class: 'scroll nonav' },
       h('div', { class: 'panel' },
         h('div', { class: 'hero-top' },

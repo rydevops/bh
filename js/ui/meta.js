@@ -2,7 +2,7 @@
 
 import { h } from './dom.js';
 import { icon } from './icons.js';
-import { registerScreen, go, navBar, currencyChips, toast, confirmBox, refresh, sfx } from './app.js';
+import { registerScreen, go, navBar, topBar, toast, confirmBox, refresh, sfx } from './app.js';
 import { store } from '../store.js';
 import { RESEARCH, RESEARCH_ORDER } from '../data/research.js';
 import { DAILY_POOL, WEEKLY_POOL, LOGIN_CALENDAR } from '../data/missions.js';
@@ -34,7 +34,7 @@ registerScreen('research', () => {
           onclick: () => { const res = store.update((pr) => buyResearch(pr, id)); if (res.ok) { sfx('ui_buy'); refresh(); } else toast(res.reason, true); }, html: `${icon('token')} ${cost}` }));
   });
   const el = h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } },
-    h('div', { class: 'topbar' }, currencyChips(p)),
+    topBar(p),
     h('div', { class: 'scroll' },
       h('h2', { class: 'title' }, 'Research'),
       h('p', { class: 'muted', style: { fontSize: '.84rem', margin: '4px 0 12px' } }, 'Permanent bonuses that apply to every run. Research tokens come from bosses, 3-star clears and weekly missions.'),
@@ -66,7 +66,7 @@ registerScreen('missions', () => {
   });
 
   const el = h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } },
-    h('div', { class: 'topbar' }, currencyChips(p)),
+    topBar(p),
     h('div', { class: 'scroll' },
       h('h2', { class: 'title' }, 'Missions'),
       h('div', { class: 'panel', style: { marginTop: '10px' } },
@@ -107,7 +107,7 @@ registerScreen('shop', () => {
         }, html: on ? 'Equipped' : owned ? 'Equip' : `${icon('gem')} ${t.cost}` }));
     }));
   const el = h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } },
-    h('div', { class: 'topbar' }, currencyChips(p)),
+    topBar(p),
     h('div', { class: 'scroll' },
       h('h2', { class: 'title' }, 'Wardrobe'),
       h('div', { class: 'banner-note', style: { margin: '10px 0' } }, h('span', { html: icon('shield') }), 'No ads. No real-money purchases. Gems are earned by playing, and only buy cosmetics.'),

@@ -75,8 +75,14 @@ export class Game {
     this.cut = { energy: 100, max: 100 };
 
     // Heroes
+    // Each battle deploys only the lead hero; the rest of the squad waits in `reserve` and is
+    // summoned by reward cards after waves (see rollChoices / summon).
     const n = o.squad.length;
-    this.heroes = o.squad.map((s, i) => this.makeHero(s, i, n));
+    this.allHeroes = o.squad.map((s, i) => this.makeHero(s, i, n));
+    const startN = o.deploy === 'all' ? n : Math.max(1, Math.min(n, o.deploy ?? 1));
+    this.heroes = this.allHeroes.slice(0, startN);
+    this.reserve = this.allHeroes.slice(startN);
+    this.layoutHeroes(true);
     this.rerolls = this.bonus.rerolls;
     this.choices = null;
     this.pendingPicks = this.bonus.startPicks;
@@ -92,10 +98,9 @@ export class Game {
   makeHero(s, i, n) {
     const def = HEROES[s.id];
     const rb = rankBonuses(s.rank);
-    const xs = n === 1 ? W / 2 : (W * (i + 1)) / (n + 1);
     return {
       idx: i, id: s.id, def, lv: s.lv, rank: s.rank, skin: s.skin || 'default', rb,
-      x: xs, y: this.heroY,
+      x: W / 2, tx: W / 2, y: this.heroY, spawnT: 0,
       atk: attackPower(s.id, s.lv, s.rank),
       cd: 0.3 + i * 0.11, tgt: null, recoil: 0, disabled: 0, flash: 0,
       ab: { cd: def.ability.cd * 0.35, max: def.ability.cd, active: 0, activeMax: 0 },
@@ -103,6 +108,29 @@ export class Game {
       deadEyeT: 0, beamBoost: 0, beam: null, flameOn: false, interceptCd: 3,
       shots: 0, droneT: i * 1.7,
     };
+  }
+
+  /** Hero by squad slot, or null while that hero is still in reserve. */
+  hero(i) { return this.heroes.find((h) => h.idx === i) || null; }
+
+  /** Spread the deployed heroes evenly across the wall, in squad order. Heroes glide to their new spot. */
+  layoutHeroes(snap = false) {
+    this.heroes.sort((a, b) => a.idx - b.idx);
+    const n = this.heroes.length;
+    this.heroes.forEach((h, k) => { h.tx = (W * (k + 1)) / (n + 1); if (snap) h.x = h.tx; });
+  }
+
+  /** Bring a reserve hero into the battle (reward card). */
+  summon(heroId) {
+    const k = this.reserve.findIndex((h) => h.id === heroId);
+    if (k < 0) return false;
+    const h = this.reserve.splice(k, 1)[0];
+    this.heroes.push(h);
+    this.layoutHeroes();
+    h.x = h.tx; h.spawnT = 0.8; h.cd = 0.4;
+    h.ab.cd = h.ab.max * 0.5;
+    this.ev('summon', { i: h.idx, id: h.id, x: h.x, y: h.y });
+    return true;
   }
 
   recomputeMods(initial) {
@@ -121,7 +149,7 @@ export class Game {
       if (!initial) this.ev('turret', { x: left ? 30 : W - 30, y: this.wallY - 6 });
     }
     // Ability cooldown maxima honour haste (upgrades + research + rank).
-    for (const h of this.heroes) {
+    for (const h of this.allHeroes) {
       const haste = clamp(this.mods.haste + this.bonus.haste - h.rb.cooldown, 0, 0.65);
       const frac = h.ab.max > 0 ? h.ab.cd / h.ab.max : 1;
       h.ab.max = h.def.ability.cd * (1 - haste);
@@ -235,7 +263,7 @@ export class Game {
     this.ev('waveClear', { wave: this.waveIdx });
     if (this.survival) this.base.hp = Math.min(this.base.max, this.base.hp + this.base.max * 0.08);
     // Survival offers upgrades every 2nd wave to keep runs flowing.
-    if (this.survival && this.waveIdx % 2 === 1) { this.openUpgrade(); return; }
+    if (this.survival && (this.waveIdx % 2 === 1 || this.reserve.length)) { this.openUpgrade(); return; }
     if (this.survival) { this.checkpoint(this.waveIdx + 1); this.startWave(this.waveIdx + 1); return; }
     this.openUpgrade();
   }
@@ -246,13 +274,15 @@ export class Game {
     this.choices = this.rollChoices();
     this.ev('upgradeOpen', {});
   }
-  squadTags() { const s = new Set(); for (const h of this.heroes) for (const t of h.def.tags) s.add(t); return s; }
+  squadTags() { const s = new Set(); for (const h of this.allHeroes) for (const t of h.def.tags) s.add(t); return s; }
   rollChoices(exclude = []) {
-    return rollUpgrades(this.rng, {
+    const summon = this.reserve.length > 0; // a hero reward is always on offer until the squad is complete
+    const picks = rollUpgrades(this.rng, {
       owned: this.owned, squadTags: this.squadTags(),
       enemyTags: new Set(this.stage ? this.stage.tags : ['swarm', 'armored', 'ranged']),
-      wave: Math.max(0, this.waveIdx), baseFrac: this.base.hp / this.base.max, n: 3, exclude,
+      wave: Math.max(0, this.waveIdx), baseFrac: this.base.hp / this.base.max, n: summon ? 2 : 3, exclude,
     });
+    return summon ? ['summon:' + this.reserve[0].id, ...picks] : picks;
   }
   reroll() {
     if (this.state !== 'upgrade' || this.rerolls <= 0) return false;
@@ -263,14 +293,20 @@ export class Game {
   }
   pickUpgrade(id) {
     if (this.state !== 'upgrade' || !this.choices || !this.choices.includes(id)) return false;
-    const u = UPGRADES[id];
-    this.owned[id] = (this.owned[id] || 0) + 1;
     this.stats.upgrades++;
-    if (id === 'field_repair') this.base.hp = Math.min(this.base.max, this.base.hp + this.base.max * 0.25);
-    if (id === 'quick_charge') for (const h of this.heroes) h.ab.cd = Math.max(0, h.ab.cd - h.ab.max * 0.6);
-    if (id === 'lucky_draw') this.rerolls++;
-    this.recomputeMods(false);
-    this.ev('upgradePicked', { id, cat: u.cat });
+    if (id.startsWith('summon:')) {
+      this.summon(id.slice(7));
+      this.recomputeMods(false);
+      this.ev('upgradePicked', { id, cat: 'summon' });
+    } else {
+      const u = UPGRADES[id];
+      this.owned[id] = (this.owned[id] || 0) + 1;
+      if (id === 'field_repair') this.base.hp = Math.min(this.base.max, this.base.hp + this.base.max * 0.25);
+      if (id === 'quick_charge') for (const h of this.heroes) h.ab.cd = Math.max(0, h.ab.cd - h.ab.max * 0.6);
+      if (id === 'lucky_draw') this.rerolls++;
+      this.recomputeMods(false);
+      this.ev('upgradePicked', { id, cat: u.cat });
+    }
     this.choices = null;
     if (this.pendingPicks > 0) {
       this.pendingPicks--;
@@ -290,6 +326,7 @@ export class Game {
       wave: nextWave, owned: { ...this.owned }, baseFrac: this.base.hp / this.base.max,
       rerolls: this.rerolls, stats: { ...this.stats }, seed: (this.opts.seed ?? 1) + nextWave * 7919,
       squad: this.opts.squad.map((s) => ({ ...s })),
+      deployed: this.heroes.map((h) => h.idx),
     };
   }
   checkpoint(nextWave) { this.ev('checkpoint', { snap: this.snapshot(nextWave) }); }
@@ -298,6 +335,13 @@ export class Game {
     this.stats = { ...this.stats, ...cp.stats };
     this.rerolls = cp.rerolls;
     this.pendingPicks = 0;
+    if (cp.deployed) {
+      const set = new Set(cp.deployed);
+      this.heroes = this.allHeroes.filter((h) => set.has(h.idx));
+      this.reserve = this.allHeroes.filter((h) => !set.has(h.idx));
+      if (!this.heroes.length) { this.heroes = [this.reserve.shift()]; }
+      this.layoutHeroes(true);
+    }
     this.recomputeMods(true);
     this.base.hp = Math.max(1, this.base.max * cp.baseFrac);
     this.rng = new RNG(cp.seed);
@@ -341,6 +385,8 @@ export class Game {
     if (this.base.flash > 0) this.base.flash -= dt;
     this.cut.energy = Math.min(this.cut.max, this.cut.energy + 14 * (1 + this.mods.cut * 0.8 + this.bonus.cut * 0.8) * dt);
     for (const h of this.heroes) {
+      h.x += (h.tx - h.x) * Math.min(1, dt * 5);
+      if (h.spawnT > 0) h.spawnT -= dt;
       if (h.disabled > 0) h.disabled -= dt;
       if (h.recoil > 0) h.recoil -= dt * 8;
       if (h.flash > 0) h.flash -= dt;
@@ -850,7 +896,7 @@ export class Game {
   }
 
   useAbility(i) {
-    const h = this.heroes[i];
+    const h = this.hero(i);
     if (!h || this.state !== 'combat' || h.ab.cd > 0 || h.disabled > 0) return false;
     const power = 1 + this.mods.abilityPower + h.rb.abilityPower;
     const dur = h.def.ability.dur * (1 + (power - 1) * 0.5);

@@ -85,6 +85,13 @@ export const MILESTONES = {
   hard: { stage: '3-4', label: 'Hard difficulty' },
 };
 
+/**
+ * Squads now assemble one hero per wave (summon rewards), so early waves are scaled to the reinforcements
+ * that will actually be on the field: wave 1 = lead hero only, wave 2 = two heroes, etc.
+ */
+export const REINFORCE_RAMP = [0.35, 0.6, 0.8, 0.95];
+const ramp = (k) => REINFORCE_RAMP[k] ?? 1;
+
 /** "Cost" in grunt-equivalents - heavier enemies appear in smaller numbers. */
 const COST = { grunt: 1, runner: 0.8, bulwark: 4, sentinel: 3, spitter: 2, drone: 2, splitter: 3, slimeling: 0.5 };
 
@@ -100,7 +107,7 @@ export function buildWaves(stage, { hard = false } = {}) {
   for (let k = 0; k < stage.waveCount; k++) {
     const last = k === stage.waveCount - 1;
     const groups = [];
-    const budget = (TUNE.budgetBase + stage.idx * TUNE.budgetIdx) * (1 + TUNE.waveGrow * k) * swarm * (hard ? 1.15 : 1) * (last && stage.boss ? 0.6 : 1);
+    const budget = (TUNE.budgetBase + stage.idx * TUNE.budgetIdx) * (1 + TUNE.waveGrow * k) * ramp(k) * swarm * (hard ? 1.15 : 1) * (last && stage.boss ? 0.6 : 1);
     const avail = stage.pool.filter((p) => p.from <= k);
     const wsum = avail.reduce((a, p) => a + p.w, 0);
     const span = 12 + k * 2;
@@ -125,7 +132,7 @@ export function survivalWave(n) {
     { e: 'sentinel', from: 5, w: 1.2 }, { e: 'slimeling', from: 6, w: 2 },
   ];
   const isBoss = n > 0 && n % 10 === 9;
-  const budget = (9 + n * 2.2) * (isBoss ? 0.6 : 1);
+  const budget = (9 + n * 2.2) * ramp(n) * (isBoss ? 0.6 : 1);
   const avail = pool.filter((p) => p.from <= n);
   const wsum = avail.reduce((a, p) => a + p.w, 0);
   const span = Math.min(30, 12 + n * 0.6);

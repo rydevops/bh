@@ -4,7 +4,7 @@ import { h } from './dom.js';
 import { icon } from './icons.js';
 import { openSheet, applySettings, toast, confirmBox, sfx } from './app.js';
 import { store } from '../store.js';
-import { exportText, importText, wipeSave, defaultProfile } from '../save.js';
+import { exportText, importText } from '../save.js';
 import { currentBuild, checkForUpdate } from '../update.js';
 import { audio } from '../audio/index.js';
 
@@ -59,9 +59,17 @@ export function openSettings() {
       } })),
     h('p', { class: 'muted', style: { fontSize: '.78rem', margin: '8px 0' } }, 'Install it: on iPhone tap Share → Add to Home Screen; on Android use the browser menu → Install app. The game updates itself every time you open it.'),
     h('p', { class: 'muted', style: { fontSize: '.78rem', margin: '8px 0' } }, 'Privacy: no ads, no trackers, no accounts, no analytics. Nothing leaves your device.'),
-    h('button', { class: 'btn danger small block', style: { marginTop: '12px' }, onclick: async () => {
-      if (await confirmBox('Erase all progress?', 'This deletes your save on this device. It cannot be undone (export a backup first).', 'Erase', true)) { wipeSave(); store.profile = defaultProfile(); location.reload(); }
-    } }, 'Erase progress'));
+    h('h3', { style: { fontSize: '.75rem', letterSpacing: '.1em', margin: '18px 0 0', color: '#ff8a7a' } }, 'DANGER ZONE'),
+    h('div', { class: 'panel', style: { borderColor: '#a8392c', marginTop: '6px' } },
+      h('div', { style: { fontWeight: 900 } }, 'Reset all progress'),
+      h('p', { class: 'muted', style: { fontSize: '.8rem', margin: '4px 0 10px' } }, 'Deletes your heroes, levels, stages, currencies, research and missions and starts a brand-new game. Your sound and accessibility settings are kept. This cannot be undone - export a backup first if you might want it back.'),
+      h('button', { class: 'btn danger block', 'aria-label': 'Reset all progress', onclick: async () => {
+        if (!(await confirmBox('Reset all progress?', 'Everything you have earned will be erased and you will start a new game from scratch.', 'Yes, continue', true))) return;
+        if (!(await confirmBox('Are you absolutely sure?', 'There is no way to undo this.', 'Erase everything', true))) return;
+        store.reset();
+        sheet.close();
+        location.reload();
+      } }, 'Reset all progress')));
   sheet = openSheet(body);
   return sheet;
 }

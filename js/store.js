@@ -1,6 +1,6 @@
 // Single in-memory profile with debounced persistence. Saves immediately when the page is hidden.
 
-import { loadProfile, writeProfile } from './save.js';
+import { loadProfile, writeProfile, wipeSave, defaultProfile } from './save.js';
 import { ensureMissions } from './economy.js';
 
 export const store = {
@@ -18,6 +18,18 @@ export const store = {
     clearTimeout(this.timer);
     if (now) { writeProfile(this.profile); return; }
     this.timer = setTimeout(() => writeProfile(this.profile), 350);
+  },
+  /** Erase all progress (keeps the player's audio/accessibility settings) and persist the fresh profile. */
+  reset() {
+    clearTimeout(this.timer);
+    const keep = this.profile.settings;
+    wipeSave();
+    const fresh = defaultProfile();
+    fresh.settings = { ...fresh.settings, ...keep };
+    this.profile = fresh;
+    ensureMissions(fresh);
+    writeProfile(fresh);
+    this.listeners.forEach((l) => l(fresh));
   },
   replace(p) { this.profile = p; ensureMissions(p); this.save(true); this.listeners.forEach((l) => l(p)); },
   on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); },

@@ -2,7 +2,7 @@
 
 import { h } from './dom.js';
 import { icon } from './icons.js';
-import { registerScreen, go, navBar, currencyChips, toast, confirmBox, refresh } from './app.js';
+import { registerScreen, go, navBar, topBar, toast, confirmBox, refresh } from './app.js';
 import { startCombat } from './combat.js';
 import { openSquad, powerClass } from './squad.js';
 import { store } from '../store.js';
@@ -16,7 +16,6 @@ import { squadPower } from '../progression.js';
 import { fmtFull, RNG } from '../util.js';
 import { audio } from '../audio/index.js';
 import { LOGIN_CALENDAR } from '../data/missions.js';
-import { openSettings } from './settings.js';
 
 export function selectedStage(p) {
   const s = STAGE_BY_ID[p.flags.lastStage];
@@ -59,7 +58,7 @@ registerScreen('home', () => {
     : null;
 
   const el = h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } },
-    h('div', { class: 'topbar' }, currencyChips(p), h('button', { class: 'icon-btn', 'aria-label': 'Settings', onclick: () => openSettings(), html: icon('gear') })),
+    topBar(p),
     h('div', { class: 'scroll', style: { padding: '0 0 calc(var(--nav-h) + var(--sab) + 24px)' } },
       h('div', { class: 'showcase' }, canvas, h('span', { class: 'chip world' }, world.name)),
       h('div', { class: 'panel stage-card', style: { marginLeft: '14px', marginRight: '14px' } },

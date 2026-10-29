@@ -17,10 +17,12 @@ Locally: `npm run serve` → <http://localhost:8080>
 
 ### How to play
 
-- Your squad of heroes defends a wall at the bottom of the screen and **fires automatically**.
+- Every battle starts with **just your lead hero** (squad slot 1). After each wave a gold **Summon** card lets you call the next squad member into the fight - alongside normal upgrades - so your squad assembles as the battle goes on. You choose the order in the Squad screen.
+- Your heroes defend a wall at the bottom of the screen and **fire automatically**.
 - **Swipe across enemy bullets to cut them** out of the air (limited by the CUT meter). Heavy bombs need several cuts.
 - **Tap a hero portrait** (or keys `1`–`4`) to use their ability. Cutting bullets charges abilities.
 - After each wave, **pick 1 of 3 upgrades** (skills, firepower, ammunition, defense, utility). Upgrades last for the run.
+- **Settings** (gear icon on every main screen) has audio, accessibility, save backup, update check and **Reset all progress** (double-confirmed; keeps your sound/accessibility settings).
 - Win stages to earn coins, hero fragments, gems and research tokens. Level up and rank up heroes, buy research, collect cosmetics.
 - Bosses telegraph their attacks, change phase as they are damaged, and have a **vulnerability window** after big attacks.
 
@@ -55,7 +57,8 @@ Requires Node 22+. No dependencies, no bundler — the game is plain ES modules.
 | Command | What it does |
 | --- | --- |
 | `npm run serve` | Static server on :8080 |
-| `npm test` | 39 unit/integration tests (simulation, economy, saves, PWA invariants) |
+| `npm test` | 46 unit/integration tests (simulation, economy, saves, PWA invariants) |
+| `npm run e2e` | Real-browser tests: every screen, summon flow, settings and reset, and the auto-update flow (needs Playwright) |
 | `npm run balance` | Headless bot plays every stage and prints win rates (`LVMUL=0.7 npm run balance` to test under-levelled squads) |
 | `npm run stamp` | Re-stamp `sw.js`, `js/version.js`, `version.json` (run after changing shipped files) |
 | `npm run icons` | Regenerate app icons with headless Chromium (uses the game's own sprites) |
@@ -81,6 +84,7 @@ tests/         node:test suites
 | --- | --- |
 | §3 loop, §4 combat | Auto-targeting (closest to wall, overkill avoidance, stable retargeting), pooled projectiles with pierce/splash/crit/elements, formula `Attack × Skill × Crit × Resistance`, shields + armor + armor-piercing, pause on interruption, checkpoint/resume |
 | §4.4 bullet cutting | Swipe-to-cut enemy projectiles with a regenerating CUT meter; bombs need multiple cuts. *(The GDD asks that the exact mechanic be verified against the reference game — this is one of its listed alternatives.)* |
+| §3/§5 summon format | Battles deploy only the lead hero; the rest of the squad is summoned by reward cards (a Summon card is always on offer until the squad is complete). Wave sizes follow a reinforcement ramp (`REINFORCE_RAMP`) so early waves suit the heroes actually on the field |
 | §5 heroes | Vanguard, Rook, Pulse, Patch from the GDD **+ Specter and Ember** (6 total), each with an active ability, passive, 4 rank perks, skins; 3 squad slots → 4 after stage 2-2; no duplicates; saved presets; strengths/gaps analysis |
 | §6 enemies | Grunt, Runner, Bulwark, Sentinel (+ Spitter, Drone, Splitter, Slimeling = 8 archetypes) and 3 world bosses with phases, telegraphs and vulnerability windows; `Health(stage) = Base × (1 + α·stage)` |
 | §7 upgrades | 27 in-run cards across skill / firepower / ammunition / defense / utility, weighted by squad tags, owned tags, enemy mix, rarity and caps; rerolls |

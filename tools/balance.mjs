@@ -25,6 +25,7 @@ export function playRun({ stage, hard = false, squad, seed = 1, research = {}, c
     if (g.state === 'upgrade') {
       // Prefer offense/defense by simple scoring.
       const score = (id) => {
+        if (id.startsWith('summon:')) return 99; // a sensible player always takes the new hero
         const u = UPGRADES[id];
         let s = rng();
         if (u.cat === 'defense' && g.base.hp / g.base.max < 0.6) s += 1.2;

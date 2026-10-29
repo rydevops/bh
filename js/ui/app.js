@@ -5,6 +5,7 @@ import { icon } from './icons.js';
 import { store } from '../store.js';
 import { audio } from '../audio/index.js';
 import { fmt } from '../util.js';
+import { openSettings } from './settings.js';
 
 const screens = {};
 export const registerScreen = (name, fn) => { screens[name] = fn; };
@@ -77,6 +78,16 @@ export function currencyChips(p) {
     h('span', { class: 'chip coin', html: icon('coin') + `<b>${fmt(p.coins)}</b>` }),
     h('span', { class: 'chip gem', html: icon('gem') + `<b>${fmt(p.gems)}</b>` }),
     h('span', { class: 'chip token', html: icon('token') + `<b>${fmt(p.tokens)}</b>` }));
+}
+
+/** The Settings gear - present on every main screen so reset/backup/audio are always one tap away. */
+export function gearButton() {
+  return h('button', { class: 'icon-btn', 'aria-label': 'Settings', onclick: () => openSettings(), html: icon('gear') });
+}
+
+/** Standard top bar: currency balances + Settings. */
+export function topBar(p) {
+  return h('div', { class: 'topbar' }, currencyChips(p), gearButton());
 }
 
 export function navBar(active) {

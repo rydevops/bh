@@ -2,7 +2,7 @@
 
 import { h } from './dom.js';
 import { icon } from './icons.js';
-import { registerScreen, go, sfx, currencyChips } from './app.js';
+import { registerScreen, go, sfx, topBar } from './app.js';
 import { startCombat } from './combat.js';
 import { STAGE_BY_ID, STAGES } from '../data/stages.js';
 import { HEROES } from '../data/heroes.js';
@@ -51,5 +51,5 @@ registerScreen('results', ({ result, reward, stageId, hard, survival }) => {
         h('button', { class: 'btn grow', onclick: () => startCombat(survival ? { survival: true } : { stageId, hard }) }, 'Retry'),
         h('button', { class: 'btn grow', onclick: () => go('home') }, 'Home'))));
   audio.playMusic('menu');
-  return { el: h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } }, h('div', { class: 'topbar' }, currencyChips(p)), el) };
+  return { el: h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } }, topBar(p), el) };
 });
