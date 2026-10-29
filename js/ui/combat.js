@@ -5,13 +5,13 @@ import { icon } from './icons.js';
 import { Game, W } from '../sim/game.js';
 import { Renderer, layoutFor } from '../render/renderer.js';
 import { heroPortrait } from '../render/sprites.js';
-import { STAGE_BY_ID } from '../data/stages.js';
+import { STAGE_BY_ID, WORLDS } from '../data/stages.js';
 import { RARITY } from '../data/heroes.js';
 import { UPGRADES, CATEGORY } from '../data/upgrades.js';
 import { applyRunResult } from '../economy.js';
 import { store } from '../store.js';
 import { audio } from '../audio/index.js';
-import { go, haptic, openSheet, confirmBox, applySettings, sfx, toast } from './app.js';
+import { go, haptic, openSheet, confirmBox, applySettings, sfx, toast, setEdgeColor } from './app.js';
 
 const STEP = 1 / 60;
 let session = null;
@@ -64,6 +64,8 @@ export function startCombat(opts) {
   document.body.classList.add('in-combat');
   buildHud(s);
   renderer.onEvent = (e) => onEvent(s, e);
+  // The status-bar strip matches the top row of this world's sky (see setEdgeColor).
+  renderer.onWorld = (w) => setEdgeColor(WORLDS[w].bg.mid);
   bindInput(s);
   const world = stage ? stage.world : 0;
   playBattleMusic(s, false, world);
@@ -477,6 +479,7 @@ export function endSession() {
   removeEventListener('keydown', s.handlers.key);
   removeEventListener('resize', s.handlers.resize);
   document.removeEventListener('visibilitychange', s.handlers.vis);
+  setEdgeColor(null);
   audio.stopLoops && audio.ctx && audio.stopLoops();
   audio.resume();
   clear(document.getElementById('hud'));

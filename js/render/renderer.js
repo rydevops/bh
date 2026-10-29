@@ -224,6 +224,7 @@ export class Renderer {
     const sy = this.shake > 0.1 && !this.settings.reduceShake ? (this.rng.next() - 0.5) * this.shake : 0;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const world = g.stage ? g.stage.world : Math.floor(Math.max(0, g.waveIdx) / 10) % 3;
+    if (world !== this.worldNow) { this.worldNow = world; if (this.onWorld) this.onWorld(world); }
     ctx.drawImage(background(world, g.H, g.wallY, k), 0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(k, 0, 0, k, sx * k, sy * k);
 

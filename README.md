@@ -13,6 +13,8 @@ Hosted on GitHub Pages (see [Deploying](#deploying-to-github-pages)). On a phone
 - **iPhone:** Safari → Share → *Add to Home Screen*
 - **Android:** Chrome menu → *Install app*
 
+> **iOS 26 note:** iOS 26 draws a soft system blur ("scroll edge effect") under the status bar of installed web apps. The game covers that area with a solid, colour-matched strip (`#edge`, follows the current world's sky) and uses the `black` status-bar style. The status-bar style is read when the app is added, so **remove the app from the Home Screen and add it again once** after this update.
+
 Locally: `npm run serve` → <http://localhost:8080>
 
 ### How to play
@@ -62,7 +64,7 @@ Requires Node 22+. No dependencies, no bundler — the game is plain ES modules.
 | Command | What it does |
 | --- | --- |
 | `npm run serve` | Static server on :8080 |
-| `npm test` | 61 unit/integration tests (simulation, economy, saves, PWA invariants) |
+| `npm test` | 63 unit/integration tests (simulation, economy, saves, PWA invariants) |
 | `npm run e2e` | Real-browser tests: every screen, summon flow, settings and reset, and the auto-update flow (needs Playwright) |
 | `npm run balance` | Headless bot plays every stage and prints win rates (`LVMUL=0.7 npm run balance` to test under-levelled squads) |
 | `npm run stamp` | Re-stamp `sw.js`, `js/version.js`, `version.json` (run after changing shipped files) |

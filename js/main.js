@@ -2,7 +2,7 @@
 
 import { h, clear } from './ui/dom.js';
 import { icon } from './ui/icons.js';
-import { go, applySettings, installClickSounds, registerScreen, currentScreen, toast } from './ui/app.js';
+import { go, applySettings, installClickSounds, registerScreen, currentScreen, toast, setEdgeColor } from './ui/app.js';
 import './ui/home.js';
 import './ui/stages.js';
 import './ui/heroes.js';
@@ -27,7 +27,7 @@ registerScreen('splash', ({ status }) => {
     h('div', { class: 'muted foot', style: { fontSize: '.7rem' } }, `No ads · No purchases · Build ${currentBuild()}`));
   const p = store.profile;
   const calm = matchMedia('(prefers-reduced-motion: reduce)').matches || p.settings.reduceFlash;
-  const stopScene = startTitleScene(scene, p.squad.map((id) => ({ id, skin: p.heroes[id].skin })), { animate: !calm });
+  const stopScene = startTitleScene(scene, p.squad.map((id) => ({ id, skin: p.heroes[id].skin })), { animate: !calm, onTop: setEdgeColor });
   return { el, ui: { bar, st, btn }, destroy: stopScene };
 });
 

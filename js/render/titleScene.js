@@ -29,7 +29,7 @@ export function startTitleScene(canvas, squad, opts = {}) {
   const rng = new RNG(2024);
   let raf = 0, stopped = false, t = 0, last = performance.now();
   let k = 1, H = 700, hy = 260, wallY = 480, cache = null;
-  let foes = [], shots = [], parts = [], spawnT = 0.5;
+  let foes = [], shots = [], parts = [], spawnT = 0.5, lastTop = null;
   const heroes = (squad && squad.length ? squad : [{ id: 'vanguard', skin: 'default' }, { id: 'rook', skin: 'default' }, { id: 'patch', skin: 'default' }]).slice(0, 4)
     .map((s, i, a) => ({ ...s, x: (W * (i + 1)) / (a.length + 1), cd: 0.3 + i * 0.17, recoil: 0 }));
 
@@ -217,6 +217,9 @@ export function startTitleScene(canvas, squad, opts = {}) {
     const phase = Math.max(0, t) / WORLD_SECONDS, wi = Math.floor(phase) % 3, within = (phase % 1) * WORLD_SECONDS;
     const next = (wi + 1) % 3, fading = within > WORLD_SECONDS - FADE;
     const a = fading ? (within - (WORLD_SECONDS - FADE)) / FADE : 0;
+    // Tell the page which sky colour is at the top of the screen so the status-bar strip can match it.
+    const topNow = SKY[fading && a > 0 ? next : wi].top;
+    if (topNow !== lastTop) { lastTop = topNow; if (opts.onTop) opts.onTop(topNow); }
     drawWorld(wi, 1, t);
     if (fading) drawWorld(next, a, t);
     stepActors(dt, fading && a > 0.5 ? next : wi);
