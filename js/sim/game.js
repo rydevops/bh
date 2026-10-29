@@ -317,15 +317,10 @@ export class Game {
     this.choices = this.rollChoices();
     this.ev('upgradeOpen', {});
   }
-  squadTags() { const s = new Set(); for (const h of this.allHeroes) for (const t of h.def.tags) s.add(t); return s; }
   rollChoices(exclude = []) {
     const summon = this.summonOffer && this.reserve.length > 0;
-    const picks = rollUpgrades(this.rng, {
-      owned: this.owned, squadTags: this.squadTags(),
-      enemyTags: new Set(this.stage ? this.stage.tags : ['swarm', 'armored', 'ranged']),
-      wave: Math.max(0, this.waveIdx), baseFrac: this.base.hp / this.base.max, n: summon ? 2 : 3, exclude,
-      ammoPressure: this.ammo.starve, heroes: new Set(this.heroes.map((h) => h.id)),
-    });
+    const picks = rollUpgrades(this.rng, { owned: this.owned, n: summon ? 2 : 3, exclude, heroes: new Set(this.heroes.map((h) => h.id)) });
+
     return summon ? ['summon:' + (this.reserve.some((h) => h.id === this.summonPick) ? this.summonPick : this.reserve[0].id), ...picks] : picks;
   }
   reroll() {

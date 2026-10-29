@@ -51,7 +51,7 @@ export const UPGRADES = {
     perLevel: (m) => { m.crit += 0.07; m.critMult += 0.1; },
   },
   phase_rounds: {
-    id: 'phase_rounds', bullet: true, name: 'Phase Rounds', cat: 'skill', rarity: 'rare', max: 3, icon: 'pierce',
+    id: 'phase_rounds', name: 'Phase Rounds', cat: 'skill', rarity: 'rare', max: 3, icon: 'pierce',
     tags: ['pierce', 'sniper', 'ballistic', 'rapid'], counters: ['swarm'],
     text: (l) => `Shots pierce ${l} extra target${l > 1 ? 's' : ''} (+1)`,
     perLevel: (m) => { m.pierce += 1; },
@@ -89,7 +89,7 @@ export const UPGRADES = {
     perLevel: (m) => { m.turretRate += 0.3; },
   },
   target_lock: {
-    id: 'target_lock', bullet: true, name: 'Target Lock', cat: 'firepower', rarity: 'common', max: 3, icon: 'scope',
+    id: 'target_lock', name: 'Target Lock', cat: 'firepower', rarity: 'common', max: 3, icon: 'scope',
     tags: ['sniper', 'ballistic', 'rapid'], counters: ['ranged'],
     text: (l) => `Weapon range +${p(0.12 * l)}, bullets curve toward targets`,
     perLevel: (m) => { m.range += 0.12; m.homing += 1; },
@@ -103,49 +103,49 @@ export const UPGRADES = {
 
   // ---------- Ammunition ----------
   heavy_rounds: {
-    id: 'heavy_rounds', bullet: true, name: 'Heavy Rounds', cat: 'ammo', rarity: 'common', max: 6, icon: 'bullet',
+    id: 'heavy_rounds', name: 'Heavy Rounds', cat: 'ammo', rarity: 'common', max: 6, icon: 'bullet',
     tags: ['ballistic', 'explosive', 'sniper', 'rapid'], counters: ['armored'],
     text: (l) => `Projectile damage +${p(0.18 * l)}${l > 1 ? ' (+18% each)' : ''}`,
     perLevel: (m) => { m.dmg += 0.18; },
   },
   hypervelocity: {
-    id: 'hypervelocity', bullet: true, name: 'Hypervelocity', cat: 'ammo', rarity: 'common', max: 3, icon: 'speed',
+    id: 'hypervelocity', name: 'Hypervelocity', cat: 'ammo', rarity: 'common', max: 3, icon: 'speed',
     tags: ['ballistic', 'sniper'], counters: ['fast'],
     text: (l) => `Bullet speed +${p(0.2 * l)}, damage +${p(0.06 * l)}`,
     perLevel: (m) => { m.speed += 0.2; m.dmg += 0.06; },
   },
   slicer_chambers: {
-    id: 'slicer_chambers', revolver: true, name: 'Slicer Chambers', cat: 'ammo', rarity: 'rare', max: 5, icon: 'revolver',
+    id: 'slicer_chambers', name: 'Slicer Chambers', cat: 'ammo', rarity: 'rare', max: 5, icon: 'revolver',
     tags: ['ammo', 'support'], counters: [],
     text: (l) => `The revolver loads ${1 + l} bullets for the slicer hand to cut (max 6)`,
     perLevel: (m) => { m.slicer += 1; },
   },
   quick_slicer: {
-    id: 'quick_slicer', revolver: true, name: 'Quick Slicer', cat: 'ammo', rarity: 'common', max: 3, icon: 'bolt',
+    id: 'quick_slicer', name: 'Quick Slicer', cat: 'ammo', rarity: 'common', max: 3, icon: 'bolt',
     tags: ['ammo', 'rapid'], counters: [],
     text: (l) => `The slicer hand sweeps ${Math.round(l * 15)}% faster${l > 1 ? ' (15% each)' : ''}`,
     perLevel: (m) => { m.cycle += 0.15; },
   },
   deep_pile: {
-    id: 'deep_pile', revolver: true, name: 'Deep Pile', cat: 'ammo', rarity: 'common', max: 3, icon: 'bullet',
+    id: 'deep_pile', name: 'Deep Pile', cat: 'ammo', rarity: 'common', max: 3, icon: 'bullet',
     tags: ['ammo', 'support'], counters: [],
     text: (l) => `The ammo pile holds ${8 * l} more bullets`,
     perLevel: (m) => { m.pile += 8; },
   },
   armor_piercing: {
-    id: 'armor_piercing', bullet: true, name: 'Armor-Piercing Rounds', cat: 'ammo', rarity: 'rare', max: 3, icon: 'drill',
+    id: 'armor_piercing', name: 'Armor-Piercing Rounds', cat: 'ammo', rarity: 'rare', max: 3, icon: 'drill',
     tags: ['ballistic', 'armor', 'sniper'], counters: ['armored'],
     text: (l) => `Ignore ${p(0.15 * l)} of enemy armor${l > 1 ? ' (+15% each)' : ''}`,
     perLevel: (m) => { m.armorPierce += 0.15; },
   },
   cryo_rounds: {
-    id: 'cryo_rounds', bullet: true, name: 'Cryo Rounds', cat: 'ammo', rarity: 'rare', max: 3, icon: 'snow',
+    id: 'cryo_rounds', name: 'Cryo Rounds', cat: 'ammo', rarity: 'rare', max: 3, icon: 'snow',
     tags: ['frost', 'support', 'rapid'], counters: ['fast', 'swarm'],
     text: (l) => `Hits slow enemies by ${p(0.18 * l)} for 1.5s`,
     perLevel: (m) => { m.frost += 1; },
   },
   explosive_rounds: {
-    id: 'explosive_rounds', bullet: true, name: 'Explosive Rounds', cat: 'ammo', rarity: 'epic', max: 3, icon: 'blast',
+    id: 'explosive_rounds', name: 'Explosive Rounds', cat: 'ammo', rarity: 'epic', max: 3, icon: 'blast',
     tags: ['explosive', 'area', 'ballistic'], counters: ['swarm'],
     text: (l) => `Bullets explode for ${p(0.35)} damage in a ${24 + l * 8}px radius`,
     perLevel: (m) => { m.splashR += 8; m.splashFrac = 0.35; if (m.splashR < 32) m.splashR = 32; },
@@ -209,7 +209,7 @@ for (const heroId of HERO_ORDER) {
   const hero = HEROES[heroId];
   const id = multishotId(heroId);
   UPGRADES[id] = {
-    id, hero: heroId, bullet: true, name: `${hero.name}: Multi-Shot`, cat: 'ammo', rarity: 'rare', max: 4, icon: 'magazine',
+    id, hero: heroId, name: `${hero.name}: Multi-Shot`, cat: 'ammo', rarity: 'rare', max: 4, icon: 'magazine',
     tags: hero.tags, counters: ['swarm'],
     text: (l) => `${hero.name} fires ${1 + l} bullets per shot, in a row with no reload between them (max 5). Every bullet uses ammo`,
     perLevel: (m) => { m.projBy[heroId] = (m.projBy[heroId] || 0) + 1; },
@@ -230,56 +230,22 @@ export function modsFromUpgrades(owned) {
 }
 
 /**
- * Weighted choice of `n` distinct upgrades (GDD 7.5). Weight inputs:
- * rarity, squad tag synergy, previously chosen tags, enemy composition, level caps and prerequisites.
+ * Pick `n` distinct reward cards. Every card that can currently be offered has exactly the same chance:
+ * no rarity weights, no synergy or counter bonuses, no "guaranteed" slots. A card can be offered unless it is
+ * already at its maximum level, its prerequisites are missing, it belongs to a hero who is not on the field,
+ * or it was just rerolled away (`exclude`).
  */
-export function rollUpgrades(rng, { owned, squadTags, enemyTags, wave, baseFrac, n = 3, exclude = [], ammoPressure = 0, heroes = null }) {
-  const ownedTags = new Map();
-  for (const id in owned) for (const t of UPGRADES[id].tags) ownedTags.set(t, (ownedTags.get(t) || 0) + 1);
-  const rarityBoost = 1 + Math.min(wave, 8) * 0.06; // later checkpoints skew toward rarer cards
+export function rollUpgrades(rng, { owned, n = 3, exclude = [], heroes = null }) {
   const pool = [];
   for (const id of UPGRADE_IDS) {
     const u = UPGRADES[id];
     if (exclude.includes(id)) continue;
-    const lv = owned[id] || 0;
-    if (lv >= u.max) continue;
+    if ((owned[id] || 0) >= u.max) continue;
     if (u.requires && !u.requires(owned)) continue;
     if (u.hero && heroes && !heroes.has(u.hero)) continue; // hero-specific cards only for heroes on the field
-    let w = u.rarity === 'common' ? 70 : u.rarity === 'rare' ? 24 * rarityBoost : 6 * rarityBoost * rarityBoost;
-    for (const t of u.tags) {
-      if (squadTags.has(t)) w *= 1.35;
-      if (ownedTags.has(t)) w *= 1 + 0.12 * Math.min(ownedTags.get(t), 3);
-    }
-    for (const t of u.counters) if (enemyTags.has(t)) w *= 1.3;
-    if (lv > 0) w *= 1.15; // gentle commitment bias so builds can form
-    if (id === 'field_repair') w *= baseFrac > 0.85 ? 0.1 : baseFrac < 0.5 ? 3 : 1;
-    // When the squad is burning ammo faster than the revolver makes it, the revolver cards surface.
-    if (id === 'slicer_chambers') w *= 1 + ammoPressure * 6;
-    if (id === 'quick_slicer' || id === 'deep_pile') w *= 1 + ammoPressure * 2;
-    if (u.hero) w *= 0.5; // one card per hero: keep the combined odds close to a single Multi-Shot card
-    if (id === 'aux_turret' && lv === 0) w *= 1.5; // a visible, fun milestone early
-    pool.push({ id, w });
+    pool.push(id);
   }
   const out = [];
-  const catCount = {};
-  // Every reward round puts a bullet upgrade (damage, speed, armor-piercing, frost, explosive, Multi-Shot...) and a
-  // revolver upgrade (chambers, slicer speed, pile size) on the table, so the ammo economy always has something to grow into.
-  // The first card comes from the bullet set, the second from the revolver set; the rest are rolled freely.
-  const slots = [(u) => u.bullet, (u) => u.revolver];
-  for (let k = 0; k < n && pool.length; k++) {
-    // Soft variety: cards sharing a category with one already offered are less likely.
-    let weights = pool.map((e) => e.w * (catCount[UPGRADES[e.id].cat] ? 0.5 : 1));
-    const want = slots[k];
-    if (want && pool.some((e) => want(UPGRADES[e.id]))) weights = weights.map((w, i) => (want(UPGRADES[pool[i].id]) ? w : 0));
-    const total = weights.reduce((a, b) => a + b, 0);
-    let r = rng.next() * total;
-    let idx = 0;
-    for (; idx < pool.length - 1; idx++) { r -= weights[idx]; if (r <= 0) break; }
-    while (weights[idx] === 0 && idx > 0) idx--; // never fall onto a card the slot rules out
-    const pick = pool.splice(idx, 1)[0];
-    out.push(pick.id);
-    const c = UPGRADES[pick.id].cat;
-    catCount[c] = (catCount[c] || 0) + 1;
-  }
+  while (out.length < n && pool.length) out.push(pool.splice(rng.int(0, pool.length - 1), 1)[0]);
   return out;
 }
