@@ -7,6 +7,7 @@ import { UPGRADES, modsFromUpgrades, rollUpgrades, defaultMods } from '../js/dat
 import { RNG } from '../js/util.js';
 import { playRun, expectedSquad } from '../tools/balance.mjs';
 import { ENEMIES } from '../js/data/enemies.js';
+import * as awaitedBosses from '../js/sim/bosses.js';
 const ENEMY_HP = Object.fromEntries(Object.entries(ENEMIES).map(([k, v]) => [k, v.hp]));
 
 const LAYOUT = { H: 680, wallY: 470, heroY: 524 };
@@ -594,4 +595,43 @@ test('the wave progress bar counts down as a wave is cleared and grows if more e
   assert.equal(g.waveProgress().left, first.max - 1);
   g.spawnQ.length = 0; g.enemies.length = 0;
   assert.equal(g.waveProgress().left, 0);
+});
+
+test('enemies above the engage line (behind the HUD bars) cannot be hit and do not shoot', () => {
+  const mkG = () => {
+    const g = fresh(['vanguard'], { layout: { ...LAYOUT, engageY: 120 } });
+    g.spawnQ.length = 0; g.enemies.length = 0;
+    return g;
+  };
+  // 1) not targetable, bullets pass through, no damage while above the line
+  const g = mkG();
+  const e = g.spawnEnemy('grunt', 180, { y: 60 });
+  e.speed = 0; e.hp = e.max = 1000;
+  assert.equal(e.gated, true);
+  g.hit(g.heroes[0], e, 500, { crit: false, critMult: 1, armorPierce: 0, el: 'phys', x: e.x, y: e.y });
+  assert.equal(e.hp, 1000, 'no damage while gated');
+  g.heroes[0].cd = 0; g.ammo.pile = 20;
+  step(g, 1);
+  assert.equal(g.ammo.taken, 0, 'heroes do not even take a shot at it');
+  // 2) once past the line it is a normal target
+  e.y = 200; step(g, 0.05);
+  assert.equal(e.gated, false);
+  step(g, 1);
+  assert.ok(e.hp < 1000, 'damaged once past the line');
+  // 3) a ranged enemy holds fire until it crosses the line
+  const g2 = mkG();
+  const sp = g2.spawnEnemy('spitter', 120, { y: 40 });
+  sp.speed = 0; sp.fireT = 0;
+  let shots = 0; const orig = g2.spawnEnemyBullet.bind(g2); g2.spawnEnemyBullet = (...a) => { shots++; return orig(...a); };
+  step(g2, 1.5);
+  assert.equal(shots, 0, 'no shots from behind the bars');
+  sp.y = 220; step(g2, 3);
+  assert.ok(shots > 0, 'fires after crossing');
+  // 4) bosses are never gated
+  const g3 = mkG();
+  g3.startWave(0);
+  g3.enemies.length = 0;
+  const { spawnBoss } = awaitedBosses;
+  const b = spawnBoss(g3, 'colossus');
+  assert.equal(b.gated, false);
 });

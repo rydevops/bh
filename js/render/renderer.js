@@ -434,7 +434,8 @@ export class Renderer {
     const hy = this.hy || 150;
     for (const e of arr) {
       // enemies come out of the horizon haze instead of dropping out of the sky
-      const fade = clamp((e.y - (hy - 54)) / 64, 0, 1);
+      const ey = g.engageY > -1e8 ? g.engageY : hy - 6; // fully there just past the HUD bars
+      const fade = e.boss ? 1 : clamp((e.y - (ey - 30)) / 40, 0, 1);
       if (fade <= 0.02) continue;
       ctx.globalAlpha = fade;
       const walker = e.def.behavior === 'melee' || e.def.behavior === 'ranged';
