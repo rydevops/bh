@@ -356,3 +356,82 @@ body.calm *, body.calm *::before, body.calm *::after { animation-duration: .001s
 .coach-step { font-size: .66rem; font-weight: 900; letter-spacing: .1em; color: var(--accent); }
 .coach-actions { justify-content: space-between; gap: 8px; }
 .btn.ghost { background: transparent; border-color: transparent; color: #aab8e6; text-decoration: underline; }
+
+/* =====================================================================================================================
+   Landscape (body.landscape, set by JS when the window is at least 1.2x wider than tall): phones turned sideways, tablets
+   and desktop windows. The menus get a side rail instead of the bottom bar and use the width; the battlefield stays a
+   centred column with the HUD in panels on either side (see layoutFor in render/renderer.js).
+   ===================================================================================================================== */
+body.landscape { --rail: 88px; }
+body.landscape #app { width: 100vw; }
+body.landscape #screen { padding-left: var(--sal); padding-right: var(--sar); }
+
+/* nav: bottom bar -> left rail */
+body.landscape .nav {
+  left: var(--sal); right: auto; top: 0; bottom: 0; width: var(--rail);
+  grid-template-columns: 1fr; grid-template-rows: repeat(5, 1fr); gap: 6px;
+  padding: calc(var(--sat) + 8px) 6px calc(8px + var(--sab)); background: #0a1024; border-right: 2px solid var(--line);
+}
+body.landscape .tab { min-height: 0; font-size: .6rem; }
+body.landscape .tab.main { transform: none; }
+body.landscape .dot { right: 14%; }
+body.landscape #screen > div:has(> .nav) { padding-left: var(--rail); }
+body.landscape .scroll { padding: 8px 22px calc(var(--sab) + 16px) !important; }
+body.landscape .topbar { padding: calc(var(--sat) + 8px) 22px 6px; }
+body.landscape .head { padding: calc(var(--sat) + 8px) 22px 4px; }
+body.landscape .world-tabs { padding: 0 22px 8px; }
+body.landscape .filters { margin: 0 -22px 8px; padding-left: 22px; padding-right: 22px; }
+
+/* wider content */
+body.landscape .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+body.landscape .rs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px 12px; }
+body.landscape .rs-grid > .panel { margin: 0; }
+body.landscape .map { max-width: 720px; margin: 0 auto; }
+body.landscape .home-scroll { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px 16px; align-content: start; align-items: start; }
+body.landscape .home-scroll .showcase { grid-column: 1; grid-row: 1 / span 3; margin: 0; height: min(calc(100vh - 150px), 320px); }
+body.landscape .home-scroll .stage-card, body.landscape .home-scroll .battle-wrap { grid-column: 2; margin: 0 !important; }
+body.landscape .home-scroll .battle-wrap { padding: 0; }
+body.landscape .cal { max-width: 640px; }
+
+/* sheets: a centred card instead of a bottom sheet */
+body.landscape .sheet-bg { align-items: center; justify-content: center; }
+body.landscape .sheet { width: min(calc(100% - 24px), 620px); max-height: calc(100% - 16px); border-radius: 22px; border-bottom: 2px solid var(--line); padding: 16px 18px 16px; }
+body.landscape .sheet.center-modal { margin: auto; width: min(calc(100% - 24px), 480px); }
+body.landscape .sheet .setting { padding: 5px 0; }
+body.landscape .sheet h2.title { font-size: 1.4rem !important; margin-bottom: 2px !important; }
+body.landscape .sheet .btn.big { min-height: 48px; }
+
+/* reward cards side by side */
+.upg-grid { display: block; }
+body.landscape .upg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-items: stretch; margin-top: 10px; }
+body.landscape .upg-grid .upg { margin-top: 0; }
+body.landscape .overlay { padding: calc(var(--sat) + 8px) calc(var(--sar) + 16px) calc(var(--sab) + 8px) calc(var(--sal) + 16px); }
+
+/* title screen */
+body.landscape .splash { padding-top: calc(var(--sat) + 4vh); gap: 6px; }
+body.landscape .splash .actions { top: 47%; gap: 6px; }
+body.landscape .logo { font-size: 1.7rem; }
+body.landscape .logo b { font-size: 2.3rem; }
+
+/* combat HUD: status on the left, abilities on the right, the field in the middle */
+body.landscape #hud .hud-top {
+  top: calc(var(--sat) + 8px); left: calc(var(--sal) + 10px); right: auto; width: calc(var(--field-x) - var(--sal) - 24px);
+  flex-wrap: wrap; gap: 8px;
+}
+body.landscape #hud .hud-top > .hud-btn:first-child { order: 1; }
+body.landscape #hud .hud-top > .hud-btn:last-child { order: 2; margin-left: auto; }
+body.landscape #hud .hud-mid { order: 3; flex: 1 0 100%; }
+body.landscape #hud .tray {
+  left: auto; right: calc(var(--sar) + 10px); top: calc(var(--sat) + 8px); bottom: calc(var(--sab) + 8px);
+  width: calc(var(--field-x) - var(--sar) - 24px); padding: 0; background: none; justify-content: flex-end; gap: 10px;
+}
+body.landscape .abil { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+body.landscape .ab { max-width: none; width: 100%; }
+body.landscape #hud .banner { left: var(--field-x); right: var(--field-x); }
+body.landscape #hud .tip { left: calc(var(--field-x) + 12px); right: calc(var(--field-x) + 12px); top: 18%; }
+@media (max-height: 520px) {
+  body.landscape .splash .foot { left: calc(var(--sal) + 12px); right: auto; text-align: left; bottom: calc(var(--sab) + 6px); }
+}
+body.landscape .coach-card { padding: 12px 14px 10px; }
+body.landscape .coach-card h3 { font-size: 1.1rem; }
+body.landscape .coach-card p { font-size: .84rem; line-height: 1.35; margin-bottom: 8px; }

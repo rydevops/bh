@@ -14,7 +14,7 @@ const MAX_PARTS = 520;
 const MAX_NUMS = 40;
 
 /** Where the sky meets the ground, in world px: the HUD sits in the sky above it and enemies march out of it. */
-export const horizonFor = (H) => Math.round(clamp(H * 0.22, 140, 190));
+export const horizonFor = (H, landscape = false) => (landscape ? 72 : Math.round(clamp(H * 0.22, 140, 190)));
 export { skyTop };
 export const TRAY_CSS = 128; // px reserved at the bottom for ability buttons / cut meter
 export const STRIP = 66; // world px between the heroes' feet and the tray: the revolver / ammo pile strip
@@ -25,12 +25,27 @@ export const stripY = (g) => g.heroY + 70;
 export const chamberPos = (g, slot) => { const a = -Math.PI / 2 + (slot * Math.PI) / 3; return { x: REV.cx + Math.cos(a) * 14.5, y: stripY(g) + Math.sin(a) * 14.5 }; };
 
 /** World layout for a given viewport: wall + hero row sit above the bottom tray. */
-export function layoutFor(cssW, cssH, safeBottom = 0) {
+export function layoutFor(cssW, cssH, safeBottom = 0, landscape = false) {
+  if (landscape) return landscapeLayout(cssW, cssH, safeBottom);
   const k = cssW / W;
   const H = cssH / k;
   const tray = (TRAY_CSS + safeBottom) / k;
   const heroY = H - tray - 34 - STRIP;
-  return { H, wallY: heroY - 56, heroY, k };
+  return { H, wallY: heroY - 56, heroY, k, ox: 0, fieldW: cssW, landscape: false };
+}
+
+/**
+ * Landscape: the same 360-wide battlefield, centred and scaled to the screen height. The ability buttons, CUT bar and the wall /
+ * wave bars live in side panels (DOM), so the field only needs the lane, the heroes and the revolver strip. The lane is a fixed
+ * LANDSCAPE_H world units tall, so it plays the same on a phone, a tablet and a desktop window.
+ */
+export const LANDSCAPE_H = 536, MIN_PANEL = 150;
+function landscapeLayout(cssW, cssH, safeBottom) {
+  const availH = Math.max(120, cssH - safeBottom);
+  const k = Math.min(availH / LANDSCAPE_H, (cssW - 2 * MIN_PANEL) / W);
+  const heroY = LANDSCAPE_H - 34 - STRIP;
+  const fieldW = W * k;
+  return { H: LANDSCAPE_H, wallY: heroY - 56, heroY, k, ox: (cssW - fieldW) / 2, fieldW, landscape: true };
 }
 
 export class Renderer {
@@ -53,11 +68,14 @@ export class Renderer {
     this.sorted = [];
   }
 
-  resize(cssW, cssH, dpr) {
-    this.cssW = cssW; this.cssH = cssH; this.dpr = dpr;
+  /** `view` is a layoutFor() result: the battlefield's scale and where it sits on the screen (css px). */
+  resize(cssW, cssH, dpr, view = layoutFor(cssW, cssH)) {
+    this.cssW = cssW; this.cssH = cssH; this.dpr = dpr; this.view = view;
     this.canvas.width = Math.round(cssW * dpr);
     this.canvas.height = Math.round(cssH * dpr);
-    this.k = (cssW * dpr) / W;
+    this.k = view.k * dpr;
+    this.ox = view.ox * dpr;
+    this.landscape = !!view.landscape;
     clearSpriteCache();
     this.scn = null;
   }
@@ -227,14 +245,19 @@ export class Renderer {
     const sx = this.shake > 0.1 && !this.settings.reduceShake ? (this.rng.next() - 0.5) * this.shake : 0;
     const sy = this.shake > 0.1 && !this.settings.reduceShake ? (this.rng.next() - 0.5) * this.shake : 0;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const ox = this.ox;
+    if (ox > 0) { // landscape: the battlefield is a centred column; the side panels are plain app background
+      ctx.fillStyle = '#080c1c'; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      ctx.save(); ctx.beginPath(); ctx.rect(ox, 0, Math.round(W * k), this.canvas.height); ctx.clip();
+    }
     const world = g.stage ? g.stage.world : Math.floor(Math.max(0, g.waveIdx) / 10) % 3;
     if (world !== this.worldNow) { this.worldNow = world; if (this.onWorld) this.onWorld(world); }
-    this.hy = horizonFor(g.H);
-    const key = `${g.H}:${g.wallY}`;
-    if (!this.scn || this.scnKey !== key) { this.scnKey = key; this.scn = makeScenery({ pxW: this.canvas.width, pxH: this.canvas.height, k, H: g.H, hy: this.hy, wallY: g.wallY, withWall: false }); }
+    this.hy = horizonFor(g.H, this.landscape);
+    const key = `${g.H}:${g.wallY}:${this.landscape}`;
+    if (!this.scn || this.scnKey !== key) { this.scnKey = key; this.scn = makeScenery({ pxW: Math.round(W * k), pxH: this.canvas.height, k, H: g.H, hy: this.hy, wallY: g.wallY, withWall: false }); }
     // Same living scenery as the title screen; frozen when flashing / motion is reduced, trimmed when the device is struggling.
-    this.scn.draw(ctx, world, 1, this.settings.reduceFlash ? 8 : this.t, this.fxScale < 0.7);
-    ctx.setTransform(k, 0, 0, k, sx * k, sy * k);
+    this.scn.draw(ctx, world, 1, this.settings.reduceFlash ? 8 : this.t, this.fxScale < 0.7, ox);
+    ctx.setTransform(k, 0, 0, k, ox + sx * k, sy * k);
 
     this.drawZones(ctx, g);
     this.drawTelegraphs(ctx, g);
@@ -249,7 +272,7 @@ export class Renderer {
     this.drawNumbers(ctx);
     if (blade) this.drawBlade(ctx, blade);
 
-    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.setTransform(k, 0, 0, k, ox, 0);
     // low-health vignette
     const frac = g.base.hp / g.base.max;
     if (frac < 0.35 && g.state === 'combat') {
@@ -259,6 +282,7 @@ export class Renderer {
       ctx.fillStyle = vg; ctx.fillRect(0, 0, W, g.H);
     }
     if (this.flash > 0.01) { ctx.globalAlpha = this.flash; ctx.fillStyle = this.flashColor; ctx.fillRect(0, 0, W, g.H); ctx.globalAlpha = 1; }
+    if (ox > 0) ctx.restore();
   }
 
   updateFx(g, dt) {

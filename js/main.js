@@ -2,7 +2,7 @@
 
 import { h, clear } from './ui/dom.js';
 import { icon } from './ui/icons.js';
-import { go, applySettings, installClickSounds, registerScreen, currentScreen, toast, setEdgeColor } from './ui/app.js';
+import { go, refresh, applySettings, installClickSounds, registerScreen, currentScreen, toast, setEdgeColor, watchOrientation } from './ui/app.js';
 import './ui/home.js';
 import './ui/stages.js';
 import './ui/heroes.js';
@@ -33,6 +33,7 @@ registerScreen('splash', ({ status }) => {
 });
 
 async function boot() {
+  watchOrientation(() => { if (!inCombat() && currentScreen() && currentScreen() !== 'splash') refresh(); }); // rotating redraws the menus
   measureSafeArea();
   applySettings();
   installClickSounds();

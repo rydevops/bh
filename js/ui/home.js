@@ -60,7 +60,7 @@ registerScreen('home', () => {
 
   const el = h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } },
     topBar(p),
-    h('div', { class: 'scroll', style: { padding: '0 0 calc(var(--nav-h) + var(--sab) + 24px)' } },
+    h('div', { class: 'scroll home-scroll', style: { padding: '0 0 calc(var(--nav-h) + var(--sab) + 24px)' } },
       h('div', { class: 'showcase' }, canvas, h('span', { class: 'chip world' }, world.name)),
       h('div', { class: 'panel stage-card', style: { marginLeft: '14px', marginRight: '14px' } },
         h('div', { class: 'row' },

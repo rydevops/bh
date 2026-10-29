@@ -18,7 +18,8 @@ export const skyTop = (wi) => SKY[wi].top;
  * @param o { pxW, pxH, k, H, hy, wallY, withWall } bitmap size, world scale, world height, horizon y, wall y
  * @returns { draw(ctx, world, alpha, t, lite) } draws one world's layers (leaves ctx scaled by k)
  */
-export function makeScenery({ pxW, pxH, k, H, hy, wallY, withWall = true }) {
+export function makeScenery({ pxW, pxH, k, H, hy, wallY, withWall = true, W = 360 }) {
+  const ws = W / 360; // wide worlds (landscape title screen) get proportionally more of everything
   const shadeHex = (hex, amt) => {
     const n = parseInt(hex.slice(1), 16);
     const f = (v) => Math.max(0, Math.min(255, Math.round(v + 255 * amt)));
@@ -32,25 +33,25 @@ export function makeScenery({ pxW, pxH, k, H, hy, wallY, withWall = true }) {
     const g = x.createLinearGradient(0, 0, 0, hy);
     g.addColorStop(0, c.top); g.addColorStop(0.55, c.mid); g.addColorStop(1, c.hor);
     x.fillStyle = g; x.fillRect(0, 0, W, hy + 2);
-    if (wi === 1) for (let i = 0; i < 80; i++) { x.fillStyle = `rgba(255,255,255,${0.25 + r.next() * 0.6})`; const s = r.next() < 0.12 ? 2 : 1; x.fillRect(r.range(0, W), r.range(0, hy * 0.85), s, s); }
+    if (wi === 1) for (let i = 0; i < Math.round(80 * ws); i++) { x.fillStyle = `rgba(255,255,255,${0.25 + r.next() * 0.6})`; const s = r.next() < 0.12 ? 2 : 1; x.fillRect(r.range(0, W), r.range(0, hy * 0.85), s, s); }
     if (wi === 2) { // hanging stalactites
       x.fillStyle = '#241547';
-      for (let i = 0; i < 14; i++) { const bx = i * 28 + r.range(-6, 6), bw = r.range(12, 24), bh = r.range(26, 78); x.beginPath(); x.moveTo(bx - bw / 2, 0); x.lineTo(bx + bw / 2, 0); x.lineTo(bx + r.range(-3, 3), bh); x.fill(); }
+      for (let i = 0; i < Math.ceil(W / 28); i++) { const bx = i * 28 + r.range(-6, 6), bw = r.range(12, 24), bh = r.range(26, 78); x.beginPath(); x.moveTo(bx - bw / 2, 0); x.lineTo(bx + bw / 2, 0); x.lineTo(bx + r.range(-3, 3), bh); x.fill(); }
     }
     // ground (perspective floor) + platform
     const gr = x.createLinearGradient(0, hy, 0, wallY);
     gr.addColorStop(0, c.ground); gr.addColorStop(1, shadeHex(c.ground, -0.12));
     x.fillStyle = gr; x.fillRect(0, hy, W, wallY - hy + 2);
     x.strokeStyle = 'rgba(255,255,255,.07)'; x.lineWidth = 1;
-    for (let i = -6; i <= 6; i++) { x.beginPath(); x.moveTo(W / 2 + i * 14, hy); x.lineTo(W / 2 + i * 70, wallY); x.stroke(); }
-    for (let i = 0; i < 70; i++) { const y = r.range(hy, wallY), s = 1 + ((y - hy) / (wallY - hy)) * 3; x.fillStyle = r.chance(0.5) ? 'rgba(0,0,0,.18)' : 'rgba(255,255,255,.05)'; x.beginPath(); x.ellipse(r.range(0, W), y, s * 1.8, s, 0, 0, 7); x.fill(); }
+    for (let i = -Math.ceil(6 * ws); i <= Math.ceil(6 * ws); i++) { x.beginPath(); x.moveTo(W / 2 + i * 14, hy); x.lineTo(W / 2 + i * 70, wallY); x.stroke(); }
+    for (let i = 0; i < Math.round(70 * ws); i++) { const y = r.range(hy, wallY), s = 1 + ((y - hy) / (wallY - hy)) * 3; x.fillStyle = r.chance(0.5) ? 'rgba(0,0,0,.18)' : 'rgba(255,255,255,.05)'; x.beginPath(); x.ellipse(r.range(0, W), y, s * 1.8, s, 0, 0, 7); x.fill(); }
     const pg = x.createLinearGradient(0, wallY, 0, H);
     pg.addColorStop(0, shadeHex(c.ground, 0.05)); pg.addColorStop(1, shadeHex(c.ground, -0.18));
     x.fillStyle = pg; x.fillRect(0, wallY, W, H - wallY);
     x.strokeStyle = 'rgba(0,0,0,.25)'; x.lineWidth = 2;
     for (let y = wallY + 26; y < H; y += 34) { x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); }
-    if (withWall) for (let i = 0; i < 12; i++) { x.fillStyle = i % 2 ? '#5a6078' : '#686f8a'; x.fillRect(i * 30 + 1, wallY - 14, 28, 20); x.fillStyle = 'rgba(255,255,255,.18)'; x.fillRect(i * 30 + 1, wallY - 14, 28, 4); }
-    if (withWall) { x.fillStyle = '#ffd23f'; for (let i = 0; i < 24; i += 2) x.fillRect(i * 15, wallY + 6, 8, 3); }
+    if (withWall) for (let i = 0; i < Math.ceil(W / 30); i++) { x.fillStyle = i % 2 ? '#5a6078' : '#686f8a'; x.fillRect(i * 30 + 1, wallY - 14, 28, 20); x.fillStyle = 'rgba(255,255,255,.18)'; x.fillRect(i * 30 + 1, wallY - 14, 28, 4); }
+    if (withWall) { x.fillStyle = '#ffd23f'; for (let i = 0; i < Math.ceil(W / 15); i += 2) x.fillRect(i * 15, wallY + 6, 8, 3); }
     // two scrolling skyline tiles (drawn twice to wrap)
     const tile = (col, hMin, hMax, seed) => {
       const tc = makeCanvas(Math.ceil(W * k), Math.ceil((hy + 4) * k));
@@ -72,14 +73,14 @@ export function makeScenery({ pxW, pxH, k, H, hy, wallY, withWall = true }) {
 
   const cache = SKY.map((_, wi) => buildCache(wi));
 
-  function draw(ctx, wi, alpha, tt, lite = false) {
+  function draw(ctx, wi, alpha, tt, lite = false, ox = 0) {
     const c = SKY[wi], cc = cache[wi];
     ctx.globalAlpha = alpha;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, ox, 0);
     ctx.drawImage(cc.sky, 0, 0);
-    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.setTransform(k, 0, 0, k, ox, 0);
     // sun / ringed planet / glowing moon
-    const bx = wi === 1 ? 92 : wi === 0 ? 262 : 250, by = wi === 1 ? hy * 0.5 : hy * 0.74, br = wi === 1 ? 38 : 30;
+    const bx = (wi === 1 ? 92 : wi === 0 ? 262 : 250) * ws, by = wi === 1 ? hy * 0.5 : hy * 0.74, br = wi === 1 ? 38 : 30;
     const pulse = 1 + 0.04 * Math.sin(tt * 1.4);
     const gl = ctx.createRadialGradient(bx, by, 2, bx, by, br * 3.2 * pulse);
     gl.addColorStop(0, c.glow + 'cc'); gl.addColorStop(1, c.glow + '00');
@@ -87,10 +88,10 @@ export function makeScenery({ pxW, pxH, k, H, hy, wallY, withWall = true }) {
     ctx.fillStyle = wi === 1 ? '#7fb8ff' : c.glow; ctx.beginPath(); ctx.arc(bx, by, br, 0, 7); ctx.fill();
     if (wi === 1) { ctx.strokeStyle = 'rgba(210,235,255,.7)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(bx, by + 2, br * 1.8, br * 0.38, -0.25 + Math.sin(tt * 0.3) * 0.04, 0, 7); ctx.stroke(); }
     // twinkling stars (orbital)
-    if (wi === 1) for (let i = 0; i < 14; i++) { ctx.fillStyle = `rgba(255,255,255,${0.35 + 0.55 * Math.abs(Math.sin(tt * (0.8 + (i % 5) * 0.3) + i))})`; ctx.fillRect(14 + ((i * 53) % 330), 10 + ((i * 37) % 130), 2, 2); }
+    if (wi === 1) for (let i = 0; i < Math.round(14 * ws); i++) { ctx.fillStyle = `rgba(255,255,255,${0.35 + 0.55 * Math.abs(Math.sin(tt * (0.8 + (i % 5) * 0.3) + i))})`; ctx.fillRect(14 + ((i * 53) % (W - 30)), 10 + ((i * 37) % 130), 2, 2); }
     // soft clouds drifting at two speeds
     ctx.fillStyle = wi === 0 ? 'rgba(255,205,170,.28)' : wi === 1 ? 'rgba(220,240,255,.18)' : 'rgba(190,255,200,.14)';
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < Math.round(6 * ws); i++) {
       const sp = 5 + (i % 3) * 4, cx = ((i * 83 + tt * sp) % (W + 160)) - 80, cy = 30 + (i * 29) % (hy * 0.6);
       for (let j = 0; j < 4; j++) { ctx.beginPath(); ctx.ellipse(cx + j * 16 - 24, cy + (j % 2) * 3, 22 - j * 2, 6, 0, 0, 7); ctx.fill(); }
     }
@@ -100,9 +101,9 @@ export function makeScenery({ pxW, pxH, k, H, hy, wallY, withWall = true }) {
     // world details
     if (wi === 0) { // crows
       ctx.strokeStyle = '#1b1226'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
-      for (let i = 0; i < 4; i++) { const x = ((tt * (22 + i * 4) + i * 120) % (W + 80)) - 40, y = 40 + i * 20 + Math.sin(tt * 2 + i) * 4, f = Math.sin(tt * 9 + i * 2) * 4; ctx.beginPath(); ctx.moveTo(x - 7, y - f); ctx.quadraticCurveTo(x - 3, y - 2, x, y); ctx.quadraticCurveTo(x + 3, y - 2, x + 7, y - f); ctx.stroke(); }
+      for (let i = 0; i < Math.round(4 * ws); i++) { const x = ((tt * (22 + i * 4) + i * 120) % (W + 80)) - 40, y = 40 + i * 20 + Math.sin(tt * 2 + i) * 4, f = Math.sin(tt * 9 + i * 2) * 4; ctx.beginPath(); ctx.moveTo(x - 7, y - f); ctx.quadraticCurveTo(x - 3, y - 2, x, y); ctx.quadraticCurveTo(x + 3, y - 2, x + 7, y - f); ctx.stroke(); }
     } else if (wi === 1) { // patrolling drones + searchlights from the wall
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < Math.round(3 * ws); i++) {
         const x = 60 + i * 110 + Math.sin(tt * 0.6 + i * 2) * 36, y = 50 + i * 22 + Math.sin(tt * 1.3 + i) * 5;
         ctx.fillStyle = '#10163a'; ctx.beginPath(); ctx.ellipse(x, y, 11, 4.5, 0, 0, 7); ctx.fill(); ctx.fillRect(x - 15, y - 1, 30, 1.6);
         ctx.fillStyle = Math.sin(tt * 5 + i) > 0 ? '#ff4a4a' : '#4cf0ff'; ctx.beginPath(); ctx.arc(x, y + 1, 2, 0, 7); ctx.fill();
@@ -119,7 +120,7 @@ export function makeScenery({ pxW, pxH, k, H, hy, wallY, withWall = true }) {
       for (let i = 0; i < 6; i++) { const f = ((tt * 0.35 + i / 6) % 1); const y = hy + (wallY - hy) * f * f; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
     } else { // glowing spores drifting up + pulsing floor veins
       ctx.globalCompositeOperation = 'lighter';
-      for (let i = 0; i < (lite ? 8 : 26); i++) {
+      for (let i = 0; i < Math.round((lite ? 8 : 26) * ws); i++) {
         const x = (i * 47 + Math.sin(tt * 0.7 + i) * 14) % W, y = H * 0.62 - ((tt * (8 + (i % 5) * 3) + i * 41) % (H * 0.6));
         const a = 0.25 + 0.4 * Math.abs(Math.sin(tt * 1.6 + i)), r = 1.4 + (i % 3);
         const sg = ctx.createRadialGradient(x, y, 0, x, y, r * 4); sg.addColorStop(0, `rgba(160,255,120,${a})`); sg.addColorStop(1, 'rgba(160,255,120,0)');
@@ -129,9 +130,9 @@ export function makeScenery({ pxW, pxH, k, H, hy, wallY, withWall = true }) {
     }
     if (wi === 0) { // drifting dust bands + rising embers
       ctx.fillStyle = 'rgba(255,200,150,.10)';
-      for (let i = 0; i < 4; i++) { const x = ((tt * (14 + i * 6) + i * 140) % (W + 200)) - 100, y = hy + 20 + i * 52; ctx.beginPath(); ctx.ellipse(x, y, 90, 7 + i * 2, 0, 0, 7); ctx.fill(); }
+      for (let i = 0; i < Math.round(4 * ws); i++) { const x = ((tt * (14 + i * 6) + i * 140) % (W + 200)) - 100, y = hy + 20 + i * 52; ctx.beginPath(); ctx.ellipse(x, y, 90, 7 + i * 2, 0, 0, 7); ctx.fill(); }
       ctx.fillStyle = 'rgba(255,170,90,.8)';
-      for (let i = 0; i < 16; i++) { const x = (i * 61 + Math.sin(tt + i) * 18) % W, y = wallY - ((tt * (12 + (i % 4) * 5) + i * 53) % (wallY * 0.8)); ctx.fillRect(x, y, 1.6, 1.6); }
+      for (let i = 0; i < Math.round(16 * ws); i++) { const x = (i * 61 + Math.sin(tt + i) * 18) % W, y = wallY - ((tt * (12 + (i % 4) * 5) + i * 53) % (wallY * 0.8)); ctx.fillRect(x, y, 1.6, 1.6); }
     }
     ctx.globalAlpha = 1;
   }
