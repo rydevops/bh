@@ -151,6 +151,7 @@ function onEvent(s, e) {
       s.joined = null;
       break;
     }
+    case 'loop': showBanner(s, 'WORLDS RESET', `ENEMIES ×${e.mul.toFixed(2)} STRONGER`, true, 3); haptic(60); break;
     case 'bossWarn': showBanner(s, '⚠ WARNING', e.name.toUpperCase(), true); haptic(60); break;
     case 'phase': showBanner(s, `PHASE ${g.boss ? g.boss.boss.phase + 1 : ''}`, 'IT GROWS ANGRY', true); haptic(60); break;
     case 'bossExposed': showBanner(s, 'CORE EXPOSED', 'FULL FIREPOWER!', false, 1.2); tip(s, 'tipExposed', 'The boss is exposed - it takes 50% extra damage right now!'); break;
@@ -318,7 +319,7 @@ function updateHud(s) {
   setIf(s, 'waveLeft', `${g.waveIdx}|${wp.left}|${wp.max}`, () => {
     hd.waveFill.style.width = (wp.left / wp.max) * 100 + '%';
     hd.waveBar.setAttribute('aria-valuenow', String(wp.left));
-    hd.wave.textContent = (g.survival ? `SURVIVAL · WAVE ${g.waveIdx + 1}` : `WAVE ${Math.max(1, g.waveIdx + 1)} / ${g.waveCount}`) + (wp.left > 0 && g.state === 'combat' ? ` · ${wp.left} LEFT` : '');
+    hd.wave.textContent = (g.survival ? `SURVIVAL · WAVE ${g.waveIdx + 1}${g.loopMul > 1 ? ` · ×${g.loopMul.toFixed(2)}` : ''}` : `WAVE ${Math.max(1, g.waveIdx + 1)} / ${g.waveCount}`) + (wp.left > 0 && g.state === 'combat' ? ` · ${wp.left} LEFT` : '');
   });
   setIf(s, 'base', Math.round(frac * 200), () => {
     hd.baseFill.style.width = frac * 100 + '%';

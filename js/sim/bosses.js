@@ -14,7 +14,7 @@ export function spawnBoss(g, id) {
   };
   const e = g.spawnEnemy(pseudo, W / 2, { y: -def.r * 1.3 });
   e.gated = false; // bosses manage their own targetability (see updateBoss)
-  e.hp = e.max = def.hp * (1 + (sc.hp - 1) * TUNE.bossHp);
+  e.hp = e.max = def.hp * (1 + (sc.hp - 1) * TUNE.bossHp) * e.mul; // e.mul: survival sweep multiplier
   e.armor = def.armor;
   e.world = def.world;
   e.boss = { def, phase: 0, mode: 'enter', t: 0, cycle: 0, atk: null, exposed: 0, invuln: 0, pendingShift: false, hadShield: false, label: '' };
@@ -85,7 +85,7 @@ export function updateBoss(g, e, dt) {
   }
   if (b.mode === 'atk') {
     b.atk.t += dt;
-    if (tickAttack(g, e, b.atk, ph.tempo)) { b.mode = 'idle'; b.t = 0.5 * ph.tempo; b.atk = null; }
+    if (tickAttack(g, e, b.atk, ph.tempo)) { b.mode = 'idle'; b.t = 0.5 * ph.tempo / e.mul; b.atk = null; }
   }
 }
 
@@ -169,7 +169,7 @@ function tickAttack(g, e, a, tempo) {
         const n = 5 + ph * 2;
         for (let i = 0; i < n; i++) {
           const ang = Math.PI / 2 + (i - (n - 1) / 2) * 0.17;
-          g.spawnEnemyBullet(e.x, e.y + e.r, Math.cos(ang) * 135, Math.sin(ang) * 135, 6 * sc, 6, 1, 'spit');
+          g.spawnEnemyBullet(e.x, e.y + e.r, Math.cos(ang) * 135 * e.mul, Math.sin(ang) * 135 * e.mul, 6 * sc, 6, 1, 'spit');
         }
         g.ev('bossFire', { x: e.x, y: e.y + e.r });
       }
@@ -181,7 +181,7 @@ function tickAttack(g, e, a, tempo) {
         for (const x of a.xs) {
           const dx = x - e.x, dy = g.wallY - (e.y + e.r);
           const d = Math.hypot(dx, dy);
-          g.spawnEnemyBullet(e.x, e.y + e.r, (dx / d) * 80, (dy / d) * 80, 22 * sc, 14, 3, 'bomb');
+          g.spawnEnemyBullet(e.x, e.y + e.r, (dx / d) * 80 * e.mul, (dy / d) * 80 * e.mul, 22 * sc, 14, 3, 'bomb');
         }
         g.ev('bossFire', { x: e.x, y: e.y + e.r });
       }
@@ -206,7 +206,7 @@ function tickAttack(g, e, a, tempo) {
         const n = 11;
         for (let i = 0; i < n; i++) {
           const ang = Math.PI * 0.12 + (i / (n - 1)) * Math.PI * 0.76 + (a.step % 2 ? 0.05 : -0.05);
-          g.spawnEnemyBullet(e.x, e.y + e.r * 0.6, Math.cos(ang) * 108, Math.sin(ang) * 108, 4 * sc, 5, 1, 'spit');
+          g.spawnEnemyBullet(e.x, e.y + e.r * 0.6, Math.cos(ang) * 108 * e.mul, Math.sin(ang) * 108 * e.mul, 4 * sc, 5, 1, 'spit');
         }
         g.ev('bossFire', { x: e.x, y: e.y });
       }

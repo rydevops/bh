@@ -8,6 +8,7 @@ import { RNG } from '../js/util.js';
 import { playRun, expectedSquad } from '../tools/balance.mjs';
 import { ENEMIES } from '../js/data/enemies.js';
 import * as awaitedBosses from '../js/sim/bosses.js';
+const spawnBossFn = awaitedBosses.spawnBoss;
 const ENEMY_HP = Object.fromEntries(Object.entries(ENEMIES).map(([k, v]) => [k, v.hp]));
 
 const LAYOUT = { H: 680, wallY: 470, heroY: 524 };
@@ -717,4 +718,41 @@ test('upgrade rolls give three distinct cards, skip maxed cards, missing prerequ
       assert.ok(!id.startsWith('multishot_') || id === 'multishot_vanguard');
     }
   }
+});
+
+test('Survival: after every full sweep of the three worlds all enemy stats grow by 1.2x (compounding)', async () => {
+  const { survivalLoop, survivalMul, SURVIVAL_LOOP_WAVES } = await import('../js/data/stages.js');
+  assert.equal(SURVIVAL_LOOP_WAVES, 30);
+  assert.deepEqual([0, 29, 30, 59, 60, 90].map(survivalLoop), [0, 0, 1, 1, 2, 3]);
+  assert.ok(Math.abs(survivalMul(30) - 1.2) < 1e-12 && Math.abs(survivalMul(60) - 1.44) < 1e-12);
+  const base = new Game({ stage: null, squad: squad('vanguard'), seed: 3, layout: LAYOUT, emit: false });
+  const looped = new Game({ stage: null, squad: squad('vanguard'), seed: 3, layout: LAYOUT, emit: false });
+  base.waveIdx = 29; looped.waveIdx = 30;
+  assert.equal(base.loopMul, 1);
+  assert.ok(Math.abs(looped.loopMul - 1.2) < 1e-12);
+  for (const type of ['grunt', 'spitter', 'sentinel', 'bulwark']) {
+    const def = ENEMIES[type];
+    const e = looped.spawnEnemy(type, 100, { y: 50 });
+    const sc = looped.scale();
+    const ok = (a, b, what) => assert.ok(Math.abs(a - b) < 1e-9 * Math.max(1, Math.abs(b)), `${type} ${what}: ${a} vs ${b}`);
+    ok(e.hp, def.hp * sc.hp * 1.2, 'health');
+    ok(e.shield, def.shield * sc.hp * 1.2, 'shield');
+    ok(e.speed, def.speed * 1.2, 'speed');
+    ok(e.dmg, sc.dmg * 1.2, 'damage');
+    ok(e.armor, Math.min(0.8, def.armor * 1.2), 'armor');
+    if (def.fireEvery) ok(e.fireEvery, def.fireEvery / 1.2, 'fire interval');
+  }
+  // enemy bullets fly faster too
+  const sp = looped.spawnEnemy('spitter', 100, { y: 100 });
+  let speedSeen = 0; const orig = looped.spawnEnemyBullet.bind(looped);
+  looped.spawnEnemyBullet = (x, y, vx, vy, ...r) => { speedSeen = Math.hypot(vx, vy); return orig(x, y, vx, vy, ...r); };
+  looped.enemyShoot(sp);
+  assert.ok(Math.abs(speedSeen - ENEMIES.spitter.bullet.speed * 1.2) < 1e-6);
+  // the campaign is untouched
+  const camp = fresh(['vanguard']); camp.waveIdx = 30;
+  assert.equal(camp.loopMul, 1);
+  // bosses scale too (hp, bullet speed)
+  const boss = looped.enemies.length && spawnBossFn(looped, 'colossus');
+  assert.ok(boss.max > spawnBossFn(base, 'colossus').max * 1.19, 'boss health scaled');
+  assert.equal(boss.mul, looped.loopMul);
 });
