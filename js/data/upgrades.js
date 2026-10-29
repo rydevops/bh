@@ -4,6 +4,8 @@
 // Each upgrade is applied by calling perLevel(mods) once per owned level, so mods are
 // always re-derivable from `{id: level}` - which is exactly what we persist in a checkpoint.
 
+import { HEROES, HERO_ORDER } from './heroes.js';
+
 export const CATEGORY = {
   skill: { name: 'Skill', group: 'Offense', color: '#ffb02e' },
   firepower: { name: 'Firepower', group: 'Offense', color: '#ff6b4a' },
@@ -14,16 +16,19 @@ export const CATEGORY = {
 
 export function defaultMods() {
   return {
-    dmg: 0, rate: 0, crit: 0, critMult: 0, pierce: 0, speed: 0, range: 0, proj: 0,
+    dmg: 0, rate: 0, crit: 0, critMult: 0, pierce: 0, speed: 0, range: 0,
     splashR: 0, splashFrac: 0, armorPierce: 0, haste: 0, burn: 0, frost: 0,
     turrets: 0, turretDmg: 0, turretRate: 0, focus: 0, homing: 0,
     reduce: 0, hpMult: 0, regen: 0, coin: 0, cut: 0, rerolls: 0, reload: 0,
     slicer: 0, cycle: 0, pile: 0, // revolver: extra bullets per cut, cycle speed-up, pile capacity
+    projBy: {}, // Multi-Shot is per hero: { heroId: extra bullets per shot }
     abilityPower: 0, abilityTargets: 0,
   };
 }
 
 const p = (v) => Math.round(v * 100) + '%';
+
+export const multishotId = (heroId) => `multishot_${heroId}`;
 
 export const UPGRADES = {
   // ---------- Skill ----------
@@ -108,12 +113,6 @@ export const UPGRADES = {
     tags: ['ballistic', 'sniper'], counters: ['fast'],
     text: (l) => `Bullet speed +${p(0.2 * l)}, damage +${p(0.06 * l)}`,
     perLevel: (m) => { m.speed += 0.2; m.dmg += 0.06; },
-  },
-  extended_mag: {
-    id: 'extended_mag', name: 'Multi-Shot', cat: 'ammo', rarity: 'rare', max: 4, icon: 'magazine',
-    tags: ['rapid', 'ballistic', 'explosive'], counters: ['swarm'],
-    text: (l) => `Each shot fires ${1 + l} bullets in a row, one after another, with no reload between them (max 5). Every bullet uses ammo`,
-    perLevel: (m) => { m.proj += 1; },
   },
   slicer_chambers: {
     id: 'slicer_chambers', name: 'Slicer Chambers', cat: 'ammo', rarity: 'rare', max: 5, icon: 'revolver',
@@ -205,6 +204,18 @@ export const UPGRADES = {
   },
 };
 
+// Multi-Shot belongs to one hero: every hero has their own card (and their own levels), up to 5 bullets per shot.
+for (const heroId of HERO_ORDER) {
+  const hero = HEROES[heroId];
+  const id = multishotId(heroId);
+  UPGRADES[id] = {
+    id, hero: heroId, name: `${hero.name}: Multi-Shot`, cat: 'ammo', rarity: 'rare', max: 4, icon: 'magazine',
+    tags: hero.tags, counters: ['swarm'],
+    text: (l) => `${hero.name} fires ${1 + l} bullets per shot, in a row with no reload between them (max 5). Every bullet uses ammo`,
+    perLevel: (m) => { m.projBy[heroId] = (m.projBy[heroId] || 0) + 1; },
+  };
+}
+
 export const UPGRADE_IDS = Object.keys(UPGRADES);
 
 /** Rebuild the modifier set from {id: level}. */
@@ -222,7 +233,7 @@ export function modsFromUpgrades(owned) {
  * Weighted choice of `n` distinct upgrades (GDD 7.5). Weight inputs:
  * rarity, squad tag synergy, previously chosen tags, enemy composition, level caps and prerequisites.
  */
-export function rollUpgrades(rng, { owned, squadTags, enemyTags, wave, baseFrac, n = 3, exclude = [], ammoPressure = 0 }) {
+export function rollUpgrades(rng, { owned, squadTags, enemyTags, wave, baseFrac, n = 3, exclude = [], ammoPressure = 0, heroes = null }) {
   const ownedTags = new Map();
   for (const id in owned) for (const t of UPGRADES[id].tags) ownedTags.set(t, (ownedTags.get(t) || 0) + 1);
   const rarityBoost = 1 + Math.min(wave, 8) * 0.06; // later checkpoints skew toward rarer cards
@@ -233,6 +244,7 @@ export function rollUpgrades(rng, { owned, squadTags, enemyTags, wave, baseFrac,
     const lv = owned[id] || 0;
     if (lv >= u.max) continue;
     if (u.requires && !u.requires(owned)) continue;
+    if (u.hero && heroes && !heroes.has(u.hero)) continue; // hero-specific cards only for heroes on the field
     let w = u.rarity === 'common' ? 70 : u.rarity === 'rare' ? 24 * rarityBoost : 6 * rarityBoost * rarityBoost;
     for (const t of u.tags) {
       if (squadTags.has(t)) w *= 1.35;
@@ -244,6 +256,7 @@ export function rollUpgrades(rng, { owned, squadTags, enemyTags, wave, baseFrac,
     // When the squad is burning ammo faster than the revolver makes it, the revolver cards surface.
     if (id === 'slicer_chambers') w *= 1 + ammoPressure * 6;
     if (id === 'quick_slicer' || id === 'deep_pile') w *= 1 + ammoPressure * 2;
+    if (u.hero) w *= 0.5; // one card per hero: keep the combined odds close to a single Multi-Shot card
     if (id === 'aux_turret' && lv === 0) w *= 1.5; // a visible, fun milestone early
     pool.push({ id, w });
   }

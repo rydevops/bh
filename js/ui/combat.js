@@ -423,7 +423,9 @@ function upgradeCard(s, id) {
       }
     },
   },
-    h('div', { class: 'ic', style: { background: `linear-gradient(${cat.color}, ${cat.color}88)` }, html: icon(u.icon) }),
+    u.hero
+      ? h('div', { class: 'ic portrait', style: { borderColor: cat.color } }, h('img', { src: heroPortrait(u.hero, (g.allHeroes.find((x) => x.id === u.hero) || {}).skin || 'default', 64), alt: '' }))
+      : h('div', { class: 'ic', style: { background: `linear-gradient(${cat.color}, ${cat.color}88)` }, html: icon(u.icon) }),
     h('div', { class: 'grow' },
       h('div', { class: 'nm' }, u.name),
       h('div', { class: 'fx' }, u.text(next)),

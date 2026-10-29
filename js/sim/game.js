@@ -5,7 +5,7 @@
 import { clamp, dist, pointSegDist2, Pool, RNG } from '../util.js';
 import { HEROES } from '../data/heroes.js';
 import { ENEMIES, BOSSES, MODIFIERS, statScale } from '../data/enemies.js';
-import { UPGRADES, modsFromUpgrades, rollUpgrades } from '../data/upgrades.js';
+import { UPGRADES, modsFromUpgrades, rollUpgrades, multishotId } from '../data/upgrades.js';
 import { buildWaves, survivalWave } from '../data/stages.js';
 import { researchBonuses } from '../data/research.js';
 import { attackPower, levelMult, rankBonuses } from '../progression.js';
@@ -325,7 +325,7 @@ export class Game {
       owned: this.owned, squadTags: this.squadTags(),
       enemyTags: new Set(this.stage ? this.stage.tags : ['swarm', 'armored', 'ranged']),
       wave: Math.max(0, this.waveIdx), baseFrac: this.base.hp / this.base.max, n: summon ? 2 : 3, exclude,
-      ammoPressure: this.ammo.starve,
+      ammoPressure: this.ammo.starve, heroes: new Set(this.heroes.map((h) => h.id)),
     });
     return summon ? ['summon:' + this.reserve[0].id, ...picks] : picks;
   }
@@ -376,7 +376,11 @@ export class Game {
   }
   checkpoint(nextWave) { this.ev('checkpoint', { snap: this.snapshot(nextWave) }); }
   restore(cp) {
-    this.owned = { ...cp.owned };
+    this.owned = {};
+    for (const id in cp.owned) { // saves from before Multi-Shot became per-hero: give it to the lead hero
+      if (UPGRADES[id]) this.owned[id] = cp.owned[id];
+      else if (id === 'extended_mag' && cp.squad && cp.squad[0]) this.owned[multishotId(cp.squad[0].id)] = cp.owned[id];
+    }
     this.stats = { ...this.stats, ...cp.stats };
     this.rerolls = cp.rerolls;
     this.pendingPicks = 0;
@@ -671,7 +675,7 @@ export class Game {
             this.fire(h, t);
             this.ev('pull', { i: h.idx, n: got });
             // Multi-Shot: the follow-up bullets leave one after another, with no reload gauge in between.
-            h.seq = this.mods.proj; h.seqT = SEQ_GAP;
+            h.seq = this.mods.projBy[h.id] || 0; h.seqT = SEQ_GAP;
           }
         } else { h.retryT = 0.05; h.dry = false; }
       }
@@ -766,7 +770,7 @@ export class Game {
     if (h.cd < 0) h.cd = 0;
     h.burstT = h.def.base.burst;
     h.tickCd = 0;
-    h.seq = this.mods.proj;
+    h.seq = this.mods.projBy[h.id] || 0;
     this.ev('pull', { i: h.idx, n: 1 });
     return true;
   }
