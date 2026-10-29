@@ -122,13 +122,16 @@ function onEvent(s, e) {
     case 'wave': {
       if (e.boss) playBattleMusic(s, true);
       const label = g.survival ? `WAVE ${e.wave + 1}` : `WAVE ${e.wave + 1}`;
-      showBanner(s, e.boss ? 'BOSS WAVE' : label, g.survival ? 'SURVIVAL' : `of ${e.total}`, e.boss);
+      const sub = g.survival ? 'SURVIVAL' : `of ${e.total}`;
+      showBanner(s, e.boss ? 'BOSS WAVE' : label, s.joined ? `${s.joined} JOINS THE SQUAD` : sub, e.boss, s.joined ? 2.6 : 2.1);
+      s.joined = null;
       break;
     }
     case 'bossWarn': showBanner(s, '⚠ WARNING', e.name.toUpperCase(), true); haptic(60); break;
     case 'phase': showBanner(s, `PHASE ${g.boss ? g.boss.boss.phase + 1 : ''}`, 'IT GROWS ANGRY', true); haptic(60); break;
     case 'bossExposed': showBanner(s, 'CORE EXPOSED', 'FULL FIREPOWER!', false, 1.2); tip(s, 'tipExposed', 'The boss is exposed - it takes 50% extra damage right now!'); break;
     case 'upgradeOpen': showUpgrade(s); break;
+    case 'summon': s.joined = g.allHeroes[e.i].def.name.toUpperCase(); haptic(40); break; // announced with the next wave banner
     case 'checkpoint':
       store.update((p) => { p.checkpoint = e.snap; });
       store.save(true);
@@ -167,7 +170,7 @@ function updateTips(s, dt) {
   if (s.tipT > 0) { s.tipT -= s.paused ? 0 : dt; if (s.tipT <= 0) s.hud.tip.classList.remove('show'); }
   const g = s.game;
   if (g.state !== 'combat' || s.paused) return;
-  if (g.t > 0.8) tip(s, 'tipAuto', 'Your heroes fire automatically. Hold the wall!');
+  if (g.t > 0.8) tip(s, 'tipAuto', g.reserve.length ? 'Your hero fires automatically. Clear waves to summon the rest of your squad!' : 'Your heroes fire automatically. Hold the wall!');
   if (g.t > 8 && g.heroes.some((h) => h.ab.cd <= 0)) tip(s, 'tipAbility', 'Tap a hero portrait below to unleash their ability.');
   if (g.ebullets.items.length > 0) tip(s, 'tipCut', 'Swipe across enemy bullets to CUT them before they hit the wall!', 5);
 }
@@ -221,7 +224,7 @@ function relayout(s) {
   const L = layoutFor(cssW, cssH, safeBottom);
   const g = s.game;
   g.H = L.H; g.wallY = L.wallY; g.heroY = L.heroY;
-  for (const hh of g.heroes) hh.y = L.heroY;
+  for (const hh of g.allHeroes) hh.y = L.heroY;
   for (const t of g.turrets) t.y = L.wallY - 6;
   s.renderer.resize(cssW, cssH, s.dpr);
 }
@@ -243,7 +246,7 @@ function buildHud(s) {
   hd.banner = h('div', { class: 'banner title' });
   hd.tip = h('div', { class: 'tip', role: 'status' });
   hd.cutFill = h('i');
-  hd.abs = g.heroes.map((hero, i) => {
+  hd.abs = g.allHeroes.map((hero, i) => {
     const img = h('img', { src: heroPortrait(hero.id, hero.skin, 64), alt: hero.def.name });
     const shade = h('div', { class: 'shade' });
     const cd = h('div', { class: 'cd' });
@@ -291,13 +294,19 @@ function updateHud(s) {
   }
   const cutp = Math.round((g.cut.energy / g.cut.max) * 100);
   setIf(s, 'cut', cutp, () => { hd.cutFill.style.width = cutp + '%'; });
-  g.heroes.forEach((hero, i) => {
+  g.allHeroes.forEach((full, i) => {
     const a = hd.abs[i];
+    const hero = g.hero(i);
+    if (!hero) { // still in reserve: shown dimmed until a summon card brings them in
+      if (a.last !== 'locked') { a.last = 'locked'; a.b.className = 'ab locked'; a.b.style.setProperty('--p', 0); a.cd.textContent = '🔒'; }
+      return;
+    }
     const ready = hero.ab.cd <= 0 && hero.disabled <= 0;
     const p = hero.ab.max > 0 ? Math.round((hero.ab.cd / hero.ab.max) * 100) : 0;
     const key = `${p}|${ready}|${hero.disabled > 0}|${hero.ab.active > 0}|${Math.ceil(hero.ab.cd)}`;
     if (a.last !== key) {
       a.last = key;
+      a.b.classList.remove('locked');
       a.b.style.setProperty('--p', p);
       a.b.classList.toggle('ready', ready);
       a.b.classList.toggle('stunned', hero.disabled > 0);
@@ -326,7 +335,7 @@ function showUpgrade(s) {
       h('div', { class: 'center' },
         h('div', { class: 'muted', style: { fontWeight: 800, letterSpacing: '.12em', fontSize: '.78rem' } }, g.survival ? `WAVE ${g.waveIdx + 1} CLEARED` : `WAVE ${g.waveIdx + 1} / ${g.waveCount} CLEARED`),
         h('h2', { class: 'title', style: { fontSize: '1.8rem', margin: '2px 0 4px' } }, 'Choose an upgrade'),
-        h('div', { class: 'muted', style: { fontSize: '.8rem' } }, 'Upgrades last until the end of this run.')),
+        h('div', { class: 'muted', style: { fontSize: '.8rem' } }, g.reserve.length ? 'Summon your next hero - or take an upgrade. Summon rewards keep coming each wave.' : 'Upgrades last until the end of this run.')),
       cards,
       h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '14px' } }, reroll),
       owned.length ? h('div', { class: 'owned-row' }, owned) : null));
@@ -336,7 +345,27 @@ function showUpgrade(s) {
   s.paused = false;
 }
 
+function summonCard(s, id) {
+  const g = s.game;
+  const hero = g.reserve.find((r) => r.id === id.slice(7));
+  const def = hero.def;
+  return h('button', {
+    class: 'upg summon', dataset: { quiet: '1' }, 'aria-label': `Summon ${def.name}`,
+    onclick: () => { if (g.pickUpgrade(id)) { s.hud.overlay.classList.remove('on'); s.last = performance.now(); } },
+  },
+    h('div', { class: 'ic portrait' }, h('img', { src: heroPortrait(hero.id, hero.skin, 64), alt: '' })),
+    h('div', { class: 'grow' },
+      h('div', { class: 'nm' }, `Summon ${def.name}`),
+      h('div', { class: 'fx' }, `${def.weapon} · ${def.ability.name}: ${def.ability.desc.split('.')[0]}.`),
+      h('div', { class: 'meta' },
+        h('span', { class: 'pill', style: { color: '#ffd23f' } }, 'New hero'),
+        h('span', { class: 'pill', style: { color: RARITY[def.rarity].color } }, RARITY[def.rarity].name),
+        h('span', { class: 'muted' }, `Lv ${hero.lv}`))),
+    h('div', { class: 'lv' }, 'JOIN', h('br'), 'NOW'));
+}
+
 function upgradeCard(s, id) {
+  if (id.startsWith('summon:')) return summonCard(s, id);
   const g = s.game;
   const u = UPGRADES[id];
   const cat = CATEGORY[u.cat];

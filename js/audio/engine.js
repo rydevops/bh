@@ -113,6 +113,7 @@ export class AudioEngine {
       case 'phase': this.sfx('phase'); this.duck(0.5, 1.0); break;
       case 'upgradeOpen': this.sfx('upgrade_open'); break;
       case 'upgradePicked': this.sfx('upgrade_pick'); break;
+      case 'summon': this.sfx('summon'); this.duck(0.4, 0.6); break;
       case 'reroll': this.sfx('ui_click'); break;
       case 'victory': this.sfx('victory'); break;
       case 'defeat': this.sfx('defeat'); break;
@@ -199,6 +200,7 @@ export const SFX = {
   exposed: { gap: 0.3, play(e, c, t) { osc(c, 'sine', 600, 1200, t, 0.3, 0.1, e.sfxBus); osc(c, 'sine', 900, 1800, t + 0.08, 0.3, 0.08, e.sfxBus); } },
   shield: { gap: 0.2, play(e, c, t) { osc(c, 'triangle', 300, 900, t, 0.4, 0.1, e.sfxBus); } },
   phase: { gap: 0.5, play(e, c, t) { osc(c, 'sawtooth', 60, 480, t, 1.4, 0.16, e.sfxBus, 0.1); noise(e, c, 'bandpass', 300, 4000, t, 1.4, 0.16, e.sfxBus, 0.6); osc(c, 'sine', 80, 30, t + 1.3, 0.7, 0.3, e.sfxBus); } },
+  summon: { gap: 0.3, play(e, c, t) { noise(e, c, 'bandpass', 300, 5000, t, 0.7, 0.2, e.sfxBus, 0.6); [48, 55, 60, 67, 72, 79].forEach((n, i) => osc(c, 'sawtooth', midi(n), midi(n + 12), t + i * 0.06, 0.55, 0.07, e.sfxBus, 0.02)); osc(c, 'sine', 90, 35, t + 0.35, 0.45, 0.3, e.sfxBus); } },
   upgrade_open: { gap: 0.2, play(e, c, t) { [60, 67, 72].forEach((n, i) => osc(c, 'triangle', midi(n), midi(n), t + i * 0.07, 0.25, 0.08, e.sfxBus)); } },
   upgrade_pick: { gap: 0.1, play(e, c, t) { [60, 64, 67, 72, 76].forEach((n, i) => osc(c, 'square', midi(n), midi(n), t + i * 0.055, 0.2, 0.06, e.sfxBus)); } },
   victory: { gap: 1, play(e, c, t) { [[60, 0], [64, 0.13], [67, 0.26], [72, 0.4], [67, 0.6], [72, 0.72], [76, 0.86]].forEach(([n, d]) => { osc(c, 'square', midi(n), midi(n), t + d, 0.4, 0.07, e.sfxBus); osc(c, 'triangle', midi(n - 12), midi(n - 12), t + d, 0.4, 0.1, e.sfxBus); }); } },

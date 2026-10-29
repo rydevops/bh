@@ -2,7 +2,7 @@
 
 import { h } from './dom.js';
 import { icon, stars } from './icons.js';
-import { registerScreen, go, navBar, currencyChips, openSheet, toast, refresh } from './app.js';
+import { registerScreen, go, navBar, gearButton, openSheet, toast, refresh } from './app.js';
 import { startCombat } from './combat.js';
 import { openSquad, powerClass } from './squad.js';
 import { store } from '../store.js';
@@ -56,7 +56,7 @@ registerScreen('stages', ({ world } = {}) => {
       h('button', { class: 'btn small primary', disabled: !survivalUnlocked(p), onclick: () => startCombat({ survival: true }) }, 'Start')));
 
   const el = h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } },
-    h('div', { class: 'head' }, h('button', { class: 'back', 'aria-label': 'Back', onclick: () => go('home'), html: icon('back') }), h('h2', { class: 'title' }, 'Campaign')),
+    h('div', { class: 'head' }, h('button', { class: 'back', 'aria-label': 'Back', onclick: () => go('home'), html: icon('back') }), h('h2', { class: 'title grow' }, 'Campaign'), gearButton()),
     tabs,
     h('div', { class: 'scroll' }, h('p', { class: 'muted', style: { margin: '0 4px 10px', fontSize: '.82rem' } }, WORLDS[viewWorld].blurb), surv, map),
     navBar('home'));

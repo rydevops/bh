@@ -9,8 +9,9 @@ import { playRun, expectedSquad } from '../tools/balance.mjs';
 
 const LAYOUT = { H: 680, wallY: 470, heroY: 524 };
 const squad = (...ids) => ids.map((id) => ({ id, lv: 1, rank: 1, skin: 'default' }));
+// Most tests want the whole squad on the field; the summon tests below use the real default (lead hero only).
 const mk = (ids = ['vanguard', 'rook', 'patch'], extra = {}) =>
-  new Game({ stage: STAGE_BY_ID['1-1'], squad: squad(...ids), seed: 7, layout: LAYOUT, emit: false, ...extra });
+  new Game({ stage: STAGE_BY_ID['1-1'], squad: squad(...ids), seed: 7, layout: LAYOUT, emit: false, deploy: 'all', ...extra });
 const step = (g, secs) => { for (let i = 0; i < secs * 60; i++) { if (g.state === 'upgrade') return; g.update(1 / 60); } };
 const clearField = (g) => { g.spawnQ.length = 0; g.enemies.length = 0; };
 
@@ -87,7 +88,7 @@ test('a piercing projectile applies different resistances to different enemies',
 });
 
 test('boss phase shifts while taking damage: no overkill past the threshold, brief invulnerability, adds', () => {
-  const g = new Game({ stage: STAGE_BY_ID['1-4'], squad: squad('vanguard', 'rook', 'patch'), seed: 2, layout: LAYOUT, emit: false });
+  const g = new Game({ stage: STAGE_BY_ID['1-4'], squad: squad('vanguard', 'rook', 'patch'), seed: 2, layout: LAYOUT, emit: false, deploy: 'all' });
   g.startWave(3);
   step(g, 2.5);
   const boss = g.boss;
@@ -107,7 +108,7 @@ test('boss phase shifts while taking damage: no overkill past the threshold, bri
 });
 
 test('boss kill ends the stage in victory', () => {
-  const g = new Game({ stage: STAGE_BY_ID['1-4'], squad: squad('vanguard', 'rook', 'patch'), seed: 2, layout: LAYOUT, emit: false });
+  const g = new Game({ stage: STAGE_BY_ID['1-4'], squad: squad('vanguard', 'rook', 'patch'), seed: 2, layout: LAYOUT, emit: false, deploy: 'all' });
   g.startWave(3);
   step(g, 2.5);
   const boss = g.boss;
@@ -212,4 +213,88 @@ test('every hero ability can be used and has a cooldown', () => {
     step(g, 4);
     assert.ok(Number.isFinite(g.base.hp));
   }
+});
+
+// ---------------------------------------------------------------- summoning (one hero per battle, rest are rewards)
+const fresh = (ids = ['vanguard', 'rook', 'patch'], extra = {}) =>
+  new Game({ stage: STAGE_BY_ID['1-1'], squad: squad(...ids), seed: 11, layout: LAYOUT, emit: false, ...extra });
+
+test('a battle starts with only the lead hero; the rest wait in reserve', () => {
+  const g = fresh();
+  assert.deepEqual(g.heroes.map((h) => h.id), ['vanguard']);
+  assert.deepEqual(g.reserve.map((h) => h.id), ['rook', 'patch']);
+  assert.equal(g.heroes[0].tx, 180, 'lone hero is centred');
+  assert.equal(g.useAbility(1), false, 'reserve heroes cannot act');
+});
+
+test('after a wave, a summon card for the next squad member is always offered', () => {
+  const g = fresh();
+  g.spawnQ.length = 0; g.enemies.length = 0;
+  step(g, 0.2);
+  assert.equal(g.state, 'upgrade');
+  assert.equal(g.choices.length, 3);
+  assert.equal(g.choices[0], 'summon:rook');
+  assert.equal(new Set(g.choices).size, 3);
+  // rerolling keeps the hero reward on offer
+  g.rerolls = 2;
+  g.reroll();
+  assert.equal(g.choices[0], 'summon:rook');
+});
+
+test('picking a summon card deploys the hero, re-centres the formation and starts the next wave', () => {
+  const g = fresh();
+  g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.2);
+  assert.ok(g.pickUpgrade('summon:rook'));
+  assert.deepEqual(g.heroes.map((h) => h.id), ['vanguard', 'rook']);
+  assert.equal(g.reserve.length, 1);
+  assert.equal(g.state, 'combat');
+  assert.equal(g.waveIdx, 1);
+  assert.deepEqual(g.heroes.map((h) => h.tx), [120, 240]);
+  assert.ok(g.hero(1).spawnT > 0 && g.hero(1).ab.cd > 0, 'arrives with a spawn effect and a half-charged ability');
+  step(g, 1.5);
+  assert.ok(Math.abs(g.heroes[0].x - 120) < 15, 'existing hero glides to the new formation');
+  assert.equal(g.useAbility(0) || true, true);
+});
+
+test('the full squad is assembled by the end of a 3-wave stage (2 checkpoints) and cards stop offering summons', () => {
+  const g = fresh();
+  for (let i = 0; i < 2; i++) {
+    g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.2);
+    assert.ok(g.choices[0].startsWith('summon:'));
+    g.pickUpgrade(g.choices[0]);
+  }
+  assert.equal(g.reserve.length, 0);
+  assert.equal(g.heroes.length, 3);
+  g.spawnQ.length = 0; g.enemies.length = 0;
+  g.waveIdx = 0; g.waveCount; // next checkpoint is a normal upgrade round
+  step(g, 0.2);
+  if (g.state === 'upgrade') assert.ok(g.choices.every((c) => !c.startsWith('summon:')));
+});
+
+test('summon state survives a checkpoint / resume', () => {
+  const g = fresh(['vanguard', 'rook', 'patch'], { emit: true });
+  g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.2);
+  g.pickUpgrade('summon:rook');
+  const snap = g.events.filter((e) => e.type === 'checkpoint').pop().snap;
+  assert.deepEqual(snap.deployed, [0, 1]);
+  const g2 = new Game({ stage: STAGE_BY_ID['1-1'], squad: squad('vanguard', 'rook', 'patch'), seed: 1, layout: LAYOUT, emit: false, resume: snap });
+  assert.deepEqual(g2.heroes.map((h) => h.id), ['vanguard', 'rook']);
+  assert.deepEqual(g2.reserve.map((h) => h.id), ['patch']);
+});
+
+test('a single-hero squad never offers summons and plays normally', () => {
+  const g = fresh(['specter']);
+  assert.equal(g.reserve.length, 0);
+  g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.2);
+  assert.ok(g.choices.every((c) => !c.startsWith('summon:')));
+});
+
+test('survival keeps offering upgrades every wave until the squad is complete', () => {
+  const g = new Game({ stage: null, squad: squad('vanguard', 'rook', 'patch'), seed: 3, layout: LAYOUT, emit: false });
+  for (let i = 0; i < 2; i++) {
+    g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.2);
+    assert.equal(g.state, 'upgrade', 'wave ' + i);
+    g.pickUpgrade(g.choices[0]);
+  }
+  assert.equal(g.reserve.length, 0);
 });

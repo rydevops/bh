@@ -190,6 +190,10 @@ svg.i { width: 1.25em; height: 1.25em; flex: none; vertical-align: -0.22em; }
 .slot.filled { border-style: solid; border-color: var(--accent); }
 .slot .nm { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(5,8,20,.82); font-size: .68rem; font-weight: 900; padding: 3px 0; text-align: center; }
 .slot.lock { opacity: .5; }
+.slot-main { position: absolute; inset: 0; }
+.slot-x { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; background: rgba(5,8,20,.85); border: 1.5px solid var(--line); font-weight: 900; font-size: 1rem; line-height: 1; z-index: 2; }
+.lead-tag { position: absolute; top: 4px; left: 4px; padding: 1px 6px; border-radius: 99px; background: var(--accent); color: #2b1a00; font-size: .58rem; font-weight: 900; letter-spacing: .04em; z-index: 2; }
+.lead-tag.alt { background: rgba(5,8,20,.85); color: #cdd8ff; border: 1.5px solid var(--line); }
 .check { display: flex; align-items: center; gap: 6px; font-size: .8rem; padding: 2px 0; }
 .check.ok { color: var(--good); } .check.no { color: var(--muted); }
 .hscroll { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 8px; }
@@ -269,6 +273,8 @@ body.in-combat #hud { display: block; }
 .ab.ready { border-color: var(--accent); animation: ready 1s infinite; }
 .ab.active { border-color: #fff; }
 .ab.stunned { filter: grayscale(1); }
+.ab.locked { filter: grayscale(1) brightness(.45); border-style: dashed; animation: none; }
+.ab.locked .nm { opacity: .0; }
 
 /* upgrade overlay */
 .overlay { position: absolute; inset: 0; z-index: 20; display: none; flex-direction: column; justify-content: center; padding: calc(var(--sat) + 16px) 16px calc(var(--sab) + 16px); background: rgba(3,5,14,.8); backdrop-filter: blur(3px); overflow-y: auto; }
@@ -282,6 +288,9 @@ body.in-combat #hud { display: block; }
 .upg .fx { font-size: .85rem; color: #dbe5ff; margin-top: 2px; }
 .upg .meta { display: flex; gap: 6px; align-items: center; margin-top: 4px; font-size: .68rem; flex-wrap: wrap; }
 .upg .lv { margin-left: auto; font-weight: 900; font-size: .72rem; color: var(--accent); text-align: right; }
+.upg.summon { border-color: #ffd23f; background: linear-gradient(135deg, #3a2f12, var(--panel)); box-shadow: 0 0 22px rgba(255,210,63,.45); }
+.upg .ic.portrait { width: 64px; height: 64px; padding: 0; overflow: hidden; background: #0b1226; border-color: #ffd23f; }
+.upg .ic.portrait img { width: 100%; height: 100%; object-fit: cover; }
 .owned-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 12px; justify-content: center; }
 .owned-row span { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; position: relative; color: #fff; }
 .owned-row svg { width: 16px; height: 16px; }

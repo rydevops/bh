@@ -60,7 +60,7 @@ export class Renderer {
     for (const n of this.nums) n.a = false;
     this.numByEnemy.clear();
     this.shake = 0; this.flash = 0;
-    this.heroCols = game.heroes.map((h) => skinColors(h.id, h.skin));
+    this.heroCols = game.allHeroes.map((h) => skinColors(h.id, h.skin));
   }
 
   // ------------------------------------------------------------ particles
@@ -145,13 +145,24 @@ export class Renderer {
           if (motion) this.shake = 10;
           break;
         case 'bossFire': case 'bossBeam': if (motion) this.shake = Math.max(this.shake, 4); break;
+        case 'summon': {
+          const c = this.heroCols[e.i];
+          this.spawn('ring', e.x, e.y + 24, 0, 0, 0.7, 6, c.glow, { grow: 220 });
+          this.spawn('ring', e.x, e.y, 0, 0, 0.5, 4, '#ffffff', { grow: 120 });
+          this.burst(e.x, e.y, 26, 240, 0.7, 2.8, c.glow);
+          this.burst(e.x, e.y + 20, 10, 60, 0.9, 7, 'rgba(255,255,255,.35)', 'smoke');
+          if (!this.settings.reduceFlash) { this.flash = 0.35; this.flashColor = c.glow; }
+          if (motion) this.shake = Math.max(this.shake, 5);
+          break;
+        }
         case 'ability': {
-          const h = g.heroes[e.i];
+          const h = g.hero(e.i);
+          if (!h) break;
           this.spawn('ring', h.x, h.y - 10, 0, 0, 0.5, 8, this.heroCols[e.i].glow, { grow: 150 });
           this.burst(h.x, h.y - 10, 12, 140, 0.5, 2.6, this.heroCols[e.i].glow);
           break;
         }
-        case 'heroStun': { const h = g.heroes[e.i]; this.burst(h.x, h.y - 20, 8, 120, 0.4, 2.4, '#ffe14f'); break; }
+        case 'heroStun': { const h = g.hero(e.i); if (h) this.burst(h.x, h.y - 20, 8, 120, 0.4, 2.4, '#ffe14f'); break; }
         case 'victory': case 'defeat': break;
         default: break;
       }
@@ -376,8 +387,19 @@ export class Renderer {
         ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(h.x, h.y, 42, 0, 7); ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
       }
+      // Summoned heroes materialise inside a column of light.
+      const arriving = h.spawnT > 0 ? h.spawnT / 0.8 : 0;
+      if (arriving > 0) {
+        ctx.globalCompositeOperation = 'lighter';
+        const col = ctx.createLinearGradient(0, h.y - 260, 0, h.y + 30);
+        col.addColorStop(0, 'rgba(255,255,255,0)'); col.addColorStop(1, c.glow);
+        ctx.globalAlpha = 0.75 * arriving; ctx.fillStyle = col;
+        ctx.fillRect(h.x - 18 * (1.2 - arriving * 0.6), h.y - 260, 36 * (1.2 - arriving * 0.6), 290);
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      }
       if (dis) ctx.globalAlpha = 0.6;
-      ctx.drawImage(s, h.x - s.lw / 2, h.y - 6 + bob + rc - s.lh / 2 + 4, s.lw, s.lh);
+      if (arriving > 0) ctx.globalAlpha = Math.min(ctx.globalAlpha, 1 - arriving * 0.8);
+      ctx.drawImage(s, h.x - s.lw / 2, h.y - 6 + bob + rc - arriving * 30 - s.lh / 2 + 4, s.lw, s.lh);
       ctx.globalAlpha = 1;
       if (dis) {
         for (let i = 0; i < 3; i++) {
