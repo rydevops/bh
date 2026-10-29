@@ -239,7 +239,7 @@ test('hero rewards are random, but never two reward rounds in a row without one'
     for (let i = 0; i < 12 && g.reserve.length; i++) {
       checkpoint(g);
       const offered = g.choices[0].startsWith('summon:');
-      if (offered) { offers++; misses = 0; assert.equal(g.choices[0], 'summon:' + g.reserve[0].id, 'next hero in squad order'); g.pickUpgrade(g.choices[0]); }
+      if (offered) { offers++; misses = 0; assert.ok(g.reserve.some((h) => 'summon:' + h.id === g.choices[0]), 'a hero who is still waiting'); g.pickUpgrade(g.choices[0]); }
       else { misses++; sawMiss = true; g.pickUpgrade(g.choices[0]); }
       assert.ok(misses <= 1, `seed ${seed}: two reward rounds in a row without a hero`);
     }
@@ -262,12 +262,14 @@ test('hero timing really is random: different seeds assemble the squad on differ
 test('rerolling keeps an offered hero card; the card deploys the hero and re-centres the formation', () => {
   let g;
   for (let seed = 1; seed < 30; seed++) { g = fresh(['vanguard', 'rook', 'patch'], { seed }); checkpoint(g); if (g.choices[0].startsWith('summon:')) break; }
-  assert.equal(g.choices[0], 'summon:rook');
+  const card = g.choices[0];
+  const joiner = card.slice(7);
+  assert.ok(['rook', 'patch'].includes(joiner));
   g.rerolls = 2; g.reroll();
-  assert.equal(g.choices[0], 'summon:rook');
+  assert.equal(g.choices[0], card);
   assert.equal(g.choices.length, 3);
-  assert.ok(g.pickUpgrade('summon:rook'));
-  assert.deepEqual(g.heroes.map((h) => h.id), ['vanguard', 'rook']);
+  assert.ok(g.pickUpgrade(card));
+  assert.deepEqual(g.heroes.map((h) => h.id), ['vanguard', joiner]);
   assert.deepEqual(g.heroes.map((h) => h.tx), [120, 240]);
   assert.ok(g.hero(1).spawnT > 0 && g.hero(1).ab.cd > 0);
   assert.equal(g.state, 'combat');
@@ -280,14 +282,15 @@ test('summon state (and the pity counter) survives a checkpoint / resume', () =>
   for (let seed = 1; seed < 30 && !snap; seed++) {
     g = fresh(['vanguard', 'rook', 'patch'], { seed, emit: true }); checkpoint(g);
     if (!g.choices[0].startsWith('summon:')) continue;
-    g.pickUpgrade('summon:rook');
+    g.pickUpgrade(g.choices[0]);
     snap = g.events.filter((e) => e.type === 'checkpoint').pop().snap;
   }
   assert.deepEqual(snap.deployed, [0, 1]);
   assert.equal(snap.missed, 0);
   const g2 = new Game({ stage: STAGE_BY_ID['1-1'], squad: squad('vanguard', 'rook', 'patch'), seed: 1, layout: LAYOUT, emit: false, resume: snap });
-  assert.deepEqual(g2.heroes.map((h) => h.id), ['vanguard', 'rook']);
-  assert.deepEqual(g2.reserve.map((h) => h.id), ['patch']);
+  assert.equal(g2.heroes.length, 2);
+  assert.equal(g2.heroes[0].id, 'vanguard');
+  assert.equal(g2.reserve.length, 1);
 });
 
 test('a single-hero squad never offers summons', () => {
@@ -667,4 +670,15 @@ test('hero Multi-Shot cards are only offered for heroes on the field, and old ch
   assert.equal(g2.owned.multishot_vanguard, 3, 'old Multi-Shot moves to the lead hero');
   assert.equal(g2.owned.heavy_rounds, 1);
   assert.equal(g2.owned.extended_mag, undefined);
+});
+
+test('which hero a summon card brings is random, and the lead hero is whoever the player put first', () => {
+  const joined = new Set();
+  for (let seed = 1; seed <= 40; seed++) {
+    const g = fresh(['rook', 'vanguard', 'patch'], { seed });
+    assert.equal(g.heroes[0].id, 'rook', 'the chosen lead starts alone');
+    checkpoint(g);
+    if (g.choices[0].startsWith('summon:')) joined.add(g.choices[0].slice(7));
+  }
+  assert.deepEqual([...joined].sort(), ['patch', 'vanguard'], 'either waiting hero can be offered');
 });

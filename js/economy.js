@@ -4,7 +4,7 @@
 
 import { HEROES, TRAILS, MAX_RANK, RANK_COST, levelCap, levelCost, HERO_ORDER } from './data/heroes.js';
 import { RESEARCH, researchBonuses } from './data/research.js';
-import { STAGES, STAGE_BY_ID, MILESTONES, STARTERS } from './data/stages.js';
+import { STAGES, STAGE_BY_ID, MILESTONES, STARTERS, replayTokens } from './data/stages.js';
 import { DAILY_POOL, WEEKLY_POOL, LOGIN_CALENDAR } from './data/missions.js';
 import { slotCount } from './progression.js';
 
@@ -176,8 +176,7 @@ export function applyRunResult(p, result) {
       }
       if (first) out.gems += stage.gems;
       out.gems += out.newStars * 2;
-      if (stage.tokens) out.tokens += first ? stage.tokens : 1;
-      if (out.stars === 3 && prevStars < 3 && !stage.tokens) out.tokens += 1;
+      out.tokens += first ? stage.tokens : replayTokens(stage.tokens);
       if (result.hard) { rec.hard = true; rec.hardStars = Math.max(rec.hardStars || 0, out.stars); } else rec.stars = Math.max(rec.stars, out.stars);
       p.stages[stage.id] = rec;
     } else {

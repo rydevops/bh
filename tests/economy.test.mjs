@@ -192,3 +192,22 @@ test('starting heroes can rank up from stage fragments', () => {
   assert.ok(p.frags.rook >= 10, 'enough Rook fragments for rank 2 after World 1');
   assert.ok(eco.rankUpHero(p, 'rook').ok);
 });
+
+test('every stage pays research tokens: full on the first clear, half (rounded up, at least 1) on replays, more for later stages', async () => {
+  const { STAGES, STAGE_TOKENS, replayTokens } = await import('../js/data/stages.js');
+  assert.equal(STAGES.length, 12);
+  for (const s of STAGES) assert.ok(s.tokens >= 1, `${s.id} pays tokens`);
+  assert.ok(STAGES.at(-1).tokens > STAGES[0].tokens, 'later stages pay more');
+  for (let w = 0; w < 3; w++) assert.ok(STAGES[w * 4 + 3].tokens > STAGES[w * 4].tokens, 'bosses pay more than their world opener');
+  assert.deepEqual([1, 2, 3, 4, 6].map(replayTokens), [1, 1, 2, 2, 3]);
+  const p = defaultProfile();
+  const first = win(p, '1-1');
+  assert.equal(first.tokens, STAGE_TOKENS[0]);
+  win(p, '1-2'); win(p, '1-3');
+  const before = p.tokens;
+  const replay = win(p, '1-3');
+  assert.equal(replay.tokens, replayTokens(STAGES[2].tokens));
+  assert.equal(p.tokens, before + replay.tokens);
+  const lose = eco.applyRunResult(p, { runId: 'tk', mode: 'campaign', stageId: '1-3', win: false, baseFrac: 0, coinsEarned: 5, wave: 3, kills: 3 });
+  assert.equal(lose.tokens, 0, 'a defeat pays no research tokens');
+});

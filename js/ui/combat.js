@@ -11,6 +11,7 @@ import { UPGRADES, CATEGORY } from '../data/upgrades.js';
 import { applyRunResult } from '../economy.js';
 import { store } from '../store.js';
 import { audio } from '../audio/index.js';
+import { initTutorial, tutorialTick } from './tutorial.js';
 import { go, haptic, openSheet, confirmBox, applySettings, sfx, toast, setEdgeColor } from './app.js';
 
 const STEP = 1 / 60;
@@ -34,7 +35,8 @@ export function startCombat(opts) {
   if (session) endSession();
   const p = store.profile;
   const cp = opts.resume || null;
-  const stage = cp ? (cp.survival ? null : STAGE_BY_ID[cp.stageId]) : opts.survival ? null : STAGE_BY_ID[opts.stageId];
+  const tutorial = !!opts.tutorial;
+  const stage = cp ? (cp.survival ? null : STAGE_BY_ID[cp.stageId]) : tutorial ? STAGE_BY_ID['1-1'] : opts.survival ? null : STAGE_BY_ID[opts.stageId];
   const hard = cp ? cp.hard : !!opts.hard;
   const squadSrc = cp ? cp.squad : p.squad.map((id) => ({ id, lv: p.heroes[id].lv, rank: p.heroes[id].rank, skin: p.heroes[id].skin }));
   // always use the *current* hero progression for display skin, but the checkpointed levels for fairness
@@ -50,19 +52,23 @@ export function startCombat(opts) {
     stage, hard, squad: squadSrc, research: p.research, layout, seed: (Math.random() * 2 ** 31) | 0,
     autoAbility: settings.autoAbility, resume: cp,
   });
+  if (tutorial) { // a gentle practice round: a sturdy wall, and the first reward round is guaranteed to offer a hero
+    game.baseMax0 *= 3; game.recomputeMods(false); game.base.hp = game.base.max; game.summonMissed = 1;
+  }
   const renderer = new Renderer(canvas);
   renderer.resize(cssW, cssH, dpr);
   renderer.attach(game, settings, p.trail);
 
   const s = session = {
-    opts, stage, hard, game, renderer, canvas, runId, cssW, cssH, layout, dpr,
+    opts, stage, hard, game, renderer, canvas, runId, cssW, cssH, layout, dpr, tutorial,
     // 2x speed is a reward for clearing the stage once (Survival: once you have a best wave).
-    canFast: stage ? !!p.stages[stage.id] : p.survivalBest > 0,
+    canFast: !tutorial && (stage ? !!p.stages[stage.id] : p.survivalBest > 0),
     paused: false, raf: 0, acc: 0, last: performance.now(), speed: 1, trailPts: [], cutBlade: [],
     hud: null, ended: false, endTimer: 0, tipT: 0, shown: {}, lastMusic: null,
   };
   document.body.classList.add('in-combat');
   buildHud(s);
+  if (tutorial) { initTutorial(s); s.tutExit = (how) => leaveTutorial(s, how); }
   renderer.onEvent = (e) => onEvent(s, e);
   // The status-bar strip matches the top row of this world's sky (see setEdgeColor).
   renderer.onWorld = (w) => setEdgeColor(skyTop(w));
@@ -72,7 +78,7 @@ export function startCombat(opts) {
   playBattleMusic(s, false, world);
   s.last = performance.now();
   s.raf = requestAnimationFrame((t) => frame(s, t));
-  if (!cp) { store.update((pr) => { pr.checkpoint = null; }); }
+  if (!cp && !tutorial) { store.update((pr) => { pr.checkpoint = null; }); }
   return s;
 }
 
@@ -115,6 +121,7 @@ function frame(s, now) {
   updateHud(s);
   updateLoops(s);
   updateTips(s, dt);
+  tutorialTick(s);
   if ((g.state === 'victory' || g.state === 'defeat') && !s.ended) {
     const wait = g.state === 'victory' ? (g.boss === null && g.stage && g.stage.boss ? 1.9 : 1.2) : 1.3;
     if (g.endT > wait) finish(s);
@@ -151,6 +158,7 @@ function onEvent(s, e) {
     case 'slice': break;
     case 'summon': s.joined = g.allHeroes[e.i].def.name.toUpperCase(); haptic(40); break; // announced with the next wave banner
     case 'checkpoint':
+      if (s.tutorial) break; // the practice round never saves
       store.update((p) => { p.checkpoint = e.snap; });
       store.save(true);
       break;
@@ -177,7 +185,7 @@ function showBanner(s, title, sub, boss, secs = 2.1) {
 // First-time hints (stored in profile flags so they never repeat).
 function tip(s, key, text, secs = 4) {
   const seen = store.profile.flags.seen;
-  if (seen[key] || s.tipT > 0) return;
+  if (s.tutorial || seen[key] || s.tipT > 0) return; // the tutorial does its own coaching
   seen[key] = true;
   store.save();
   s.hud.tip.textContent = text;
@@ -478,8 +486,20 @@ function restart(s) {
 }
 
 // ---------------------------------------------------------------------- end of run
+/** Leave the tutorial (finished or skipped): no rewards, remember it was seen, open the main menu. */
+function leaveTutorial(s, how) {
+  if (s.ended) return;
+  s.ended = true;
+  store.update((p) => { p.flags.tutorial = true; p.checkpoint = null; });
+  store.save(true);
+  endSession();
+  audio.playMusic('menu');
+  go('home');
+}
+
 function finish(s) {
   if (s.ended) return;
+  if (s.tutorial) { leaveTutorial(s, 'end'); return; }
   s.ended = true;
   const result = s.game.result();
   result.runId = s.runId;

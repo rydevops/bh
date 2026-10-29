@@ -23,7 +23,12 @@ const path = require('path');
 
   // ---- 1. brand-new game: one hero, 2x locked
   await p.goto('http://localhost:8093/');
+  // (a brand-new profile starts with the tutorial; tools/e2e/tutorial.cjs covers it - here we mark it seen)
+  await p.evaluate(async () => { const { store } = await import('/js/store.js'); store.update((pr) => { pr.flags.tutorial = true; }); store.save(true); });
+  await p.reload();
   await startFromSplash();
+  await p.waitForSelector('.nav');
+  await p.click('button:has-text("Battle")');
   await p.waitForSelector('.ab');
   const total = await p.locator('.ab').count();
   const locked = await p.locator('.ab.locked').count();
@@ -94,6 +99,11 @@ const path = require('path');
   if (Object.keys(after.stages).length === 0 && after.coins === 0 && after.stats.runs === 0 && after.checkpoint === null) ok('reset wiped stages, coins and stats');
   else fail('reset left progress behind: ' + JSON.stringify({ stages: after.stages, coins: after.coins }));
   await p.click('text=Tap to play');
+  await p.waitForSelector('.coach.on .coach-card');
+  ok('after a reset the first-run tutorial comes back');
+  await p.click('text=Skip tutorial');
+  await p.waitForSelector('.nav');
+  await p.click('button:has-text("Battle")');
   await p.waitForSelector('.ab');
   if ((await p.locator('.ab.locked').count()) === 2) ok('after reset a brand-new game starts with one hero again'); else fail('new game after reset not fresh');
 
