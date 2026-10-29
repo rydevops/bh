@@ -5,13 +5,16 @@ import { W, CHAMBER_ORDER } from '../sim/game.js';
 import { WORLDS } from '../data/stages.js';
 import { skinColors } from '../data/heroes.js';
 import { enemySprite, bossSprite, heroSprite, droneSprite, turretSprite, flashOf, clearSpriteCache, WORLD_PAL } from './sprites.js';
-import { background, clearBackgroundCache } from './backgrounds.js';
+import { makeScenery, skyTop } from './scenery.js';
 import { clamp, fmt, RNG } from '../util.js';
 
 const EL_COLOR = { phys: '#ffffff', fire: '#ff9a3c', energy: '#7df4ff', frost: '#9bd8ff', blast: '#ffd23f' };
 const MAX_PARTS = 520;
 const MAX_NUMS = 40;
 
+/** Where the sky meets the ground, in world px: the HUD sits in the sky above it and enemies march out of it. */
+export const horizonFor = (H) => Math.round(clamp(H * 0.22, 140, 190));
+export { skyTop };
 export const TRAY_CSS = 128; // px reserved at the bottom for ability buttons / cut meter
 export const STRIP = 66; // world px between the heroes' feet and the tray: the revolver / ammo pile strip
 /** Where ammo is drawn, in world coordinates. */
@@ -55,7 +58,7 @@ export class Renderer {
     this.canvas.height = Math.round(cssH * dpr);
     this.k = (cssW * dpr) / W;
     clearSpriteCache();
-    clearBackgroundCache();
+    this.scn = null;
   }
 
   attach(game, settings, trail) {
@@ -225,7 +228,11 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const world = g.stage ? g.stage.world : Math.floor(Math.max(0, g.waveIdx) / 10) % 3;
     if (world !== this.worldNow) { this.worldNow = world; if (this.onWorld) this.onWorld(world); }
-    ctx.drawImage(background(world, g.H, g.wallY, k), 0, 0, this.canvas.width, this.canvas.height);
+    this.hy = horizonFor(g.H);
+    const key = `${g.H}:${g.wallY}`;
+    if (!this.scn || this.scnKey !== key) { this.scnKey = key; this.scn = makeScenery({ pxW: this.canvas.width, pxH: this.canvas.height, k, H: g.H, hy: this.hy, wallY: g.wallY, withWall: false }); }
+    // Same living scenery as the title screen; frozen when flashing / motion is reduced, trimmed when the device is struggling.
+    this.scn.draw(ctx, world, 1, this.settings.reduceFlash ? 8 : this.t, this.fxScale < 0.7);
     ctx.setTransform(k, 0, 0, k, sx * k, sy * k);
 
     this.drawZones(ctx, g);
@@ -424,7 +431,12 @@ export class Renderer {
     arr.sort((a, b) => a.y - b.y);
     const k = this.k;
     const hc = this.settings.highContrast;
+    const hy = this.hy || 150;
     for (const e of arr) {
+      // enemies come out of the horizon haze instead of dropping out of the sky
+      const fade = clamp((e.y - (hy - 54)) / 64, 0, 1);
+      if (fade <= 0.02) continue;
+      ctx.globalAlpha = fade;
       const walker = e.def.behavior === 'melee' || e.def.behavior === 'ranged';
       const frame = Math.floor((e.t * (e.def.fly ? 10 : 4 * Math.max(0.6, e.speed / 28))) % 2);
       let s;
@@ -443,10 +455,10 @@ export class Renderer {
         ctx.fillStyle = 'rgba(160,190,255,.06)'; ctx.fill();
       }
       const dy = e.y + bob + atk;
-      if (e.boss && e.boss.invuln > 0) ctx.globalAlpha = 0.55 + 0.25 * Math.sin(this.t * 20);
+      if (e.boss && e.boss.invuln > 0) ctx.globalAlpha = fade * (0.55 + 0.25 * Math.sin(this.t * 20));
       ctx.drawImage(s, e.x - s.lw / 2, dy - s.lh / 2, s.lw, s.lh);
-      ctx.globalAlpha = 1;
-      if (e.flash > 0) { const f = flashOf(s); ctx.globalAlpha = 0.75; ctx.drawImage(f, e.x - s.lw / 2, dy - s.lh / 2, s.lw, s.lh); ctx.globalAlpha = 1; }
+      ctx.globalAlpha = fade;
+      if (e.flash > 0) { const f = flashOf(s); ctx.globalAlpha = 0.75 * fade; ctx.drawImage(f, e.x - s.lw / 2, dy - s.lh / 2, s.lw, s.lh); ctx.globalAlpha = fade; }
       // aura-protected marker (damage reduction), shown with a shape not just colour
       if (e.aura > 0 && !e.def.aura) {
         ctx.strokeStyle = 'rgba(170,200,255,.9)'; ctx.lineWidth = 1.5;
@@ -468,6 +480,7 @@ export class Renderer {
         if (e.shieldMax > 0 && e.shield > 0) { ctx.fillStyle = '#5ae6ff'; ctx.fillRect(x, y - 2.5, w * (e.shield / e.shieldMax), 1.8); }
       }
     }
+    ctx.globalAlpha = 1;
   }
 
   snow(ctx, x, y, r) {
