@@ -6,6 +6,7 @@ import { WORLDS } from '../data/stages.js';
 import { skinColors } from '../data/heroes.js';
 import { enemySprite, bossSprite, heroSprite, droneSprite, turretSprite, flashOf, clearSpriteCache, WORLD_PAL } from './sprites.js';
 import { makeScenery, skyTop } from './scenery.js';
+import { artAnim } from './art.js';
 import { clamp, fmt, RNG } from '../util.js';
 
 const EL_COLOR = { phys: '#ffffff', fire: '#ff9a3c', energy: '#7df4ff', frost: '#9bd8ff', blast: '#ffd23f' };
@@ -494,8 +495,11 @@ export class Renderer {
     const k = this.k;
     for (const h of g.heroes) {
       // sprite-sheet heroes have a firing frame and an ability frame; procedural ones ignore the name
-      const s = heroSprite(h.id, h.skin, k, h.ab.active > 0 ? 'ability' : h.recoil > 0.45 ? 'fire' : 'idle');
-      const bob = Math.sin(this.t * 2.2 + h.idx) * 1.2;
+      // (h.recoil is 1 at the shot and falls by 8 per second, so a fire frame of `fireSec` shows while recoil > 1 - 8 * fireSec)
+      const an = artAnim(h.id, h.skin);
+      const fireOn = h.recoil > (an && an.fireSec ? 1 - 8 * an.fireSec : 0.45);
+      const s = heroSprite(h.id, h.skin, k, h.ab.active > 0 ? 'ability' : fireOn ? 'fire' : 'idle');
+      const bob = an && an.bobY && an.bobSec ? Math.sin((this.t / an.bobSec) * 6.2832 + h.idx) * (an.bobY / 2) : Math.sin(this.t * 2.2 + h.idx) * 1.2;
       const rc = Math.max(0, h.recoil) * 3;
       const dis = h.disabled > 0;
       ctx.fillStyle = 'rgba(0,0,0,.3)';
