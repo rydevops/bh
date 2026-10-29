@@ -112,7 +112,7 @@ export const UPGRADES = {
   extended_mag: {
     id: 'extended_mag', name: 'Multi-Shot', cat: 'ammo', rarity: 'rare', max: 4, icon: 'magazine',
     tags: ['rapid', 'ballistic', 'explosive'], counters: ['swarm'],
-    text: (l) => `Each shot fires ${1 + l} bullets (max 5). Extra bullets deal 75% damage and use more ammo`,
+    text: (l) => `Each shot fires ${1 + l} bullets in a row, one after another, with no reload between them (max 5). Every bullet uses ammo`,
     perLevel: (m) => { m.proj += 1; },
   },
   slicer_chambers: {
