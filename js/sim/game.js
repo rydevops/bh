@@ -154,6 +154,10 @@ export class Game {
 
   recomputeMods(initial) {
     this.mods = modsFromUpgrades(this.owned);
+    // Permanent research stacks on top of the run's upgrades.
+    const rb = this.bonus, m = this.mods;
+    m.crit += rb.crit; m.reload += rb.reload; m.reduce += rb.reduce; m.regen += rb.regen;
+    m.pile += rb.pile; m.cycle += rb.cycle; m.abilityPower += rb.abilityPower;
     const newMax = this.baseMax0 * (1 + this.mods.hpMult + this.bonus.hp);
     const delta = newMax - this.base.max;
     this.base.max = newMax;
@@ -974,8 +978,9 @@ export class Game {
       if (b.dead || b.cutCd > 0) continue;
       const rr = b.r + 9;
       if (pointSegDist2(b.x, b.y, x1, y1, x2, y2) > rr * rr) continue;
-      if (this.cut.energy < 5) break;
-      this.cut.energy -= 5;
+      const cost = 5 * (1 - Math.min(0.5, this.bonus.cutCost));
+      if (this.cut.energy < cost) break;
+      this.cut.energy -= cost;
       b.cutHp--;
       b.cutCd = 0.2;
       this.ev('cut', { x: b.x, y: b.y, big: b.kind === 'bomb' });

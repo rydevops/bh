@@ -27,11 +27,11 @@ Locally: `npm run serve` → <http://localhost:8080>
 - The **title screen** is an animated diorama that cycles through the three worlds (drifting clouds, crows, patrolling drones, searchlights, floating spores) while your squad shoots at enemies marching toward the wall. It shows a single still frame if you enable *Reduce flashing* or your device asks for reduced motion.
 - The **battlefield uses the same living scenery as the title screen**: gradient sky, sun / planet / moon, drifting clouds, parallax skylines, crows, patrol drones with searchlights and glowing spores. Enemies march out of the horizon haze, and the HUD sits in the sky, clear of the status bar.
 - Heroes defend a wall at the bottom of the screen and **fire automatically** (as long as there is ammo).
-- **Swipe across enemy bullets to cut them** out of the air (limited by the CUT meter). Heavy bombs need several cuts.
+- **CUT:** swipe a finger across an enemy bullet to slice it out of the air before it hits the wall. Each slice costs 5 energy from the **CUT bar** (bottom of the battle screen, it slowly refills); heavy bombs need several cuts; every bullet you fully cut drops into your ammo pile and charges your abilities. Research can enlarge the bar, refill it faster and make slices cheaper.
 - **Tap a hero portrait** (or keys `1`–`4`) to use their ability. Cutting bullets charges abilities.
 - After each wave, **pick 1 of 3 upgrades** (skills, firepower, ammunition, defense, utility). Upgrades last for the run.
 - **Settings** (gear icon on every main screen) has audio, accessibility, save backup, update check and **Reset all progress** (double-confirmed; keeps your sound/accessibility settings).
-- Win stages to earn coins, hero fragments, gems and research tokens. Level up and rank up heroes, buy research, collect cosmetics.
+- Win stages to earn coins, hero fragments, gems and research tokens. **Every stage drops fragments for all three starting heroes** (Vanguard, Rook, Patch) so each can be ranked up from the very first stage, and even a lost run gives each of them one. Survival pays starter fragments too. Pulse, Specter and Ember (recruited with fragments) keep their own drops. Level up and rank up heroes, buy research, collect cosmetics.
 - Bosses telegraph their attacks, change phase as they are damaged, and have a **vulnerability window** after big attacks.
 
 ## Auto-update (how it works)

@@ -178,7 +178,7 @@ function updateTips(s, dt) {
   if (g.t > 0.8) tip(s, 'tipAuto', g.reserve.length ? 'Your hero fires automatically. Clear waves to summon the rest of your squad!' : 'Your heroes fire automatically. Hold the wall!');
   if (g.t > 8 && g.heroes.some((h) => h.ab.cd <= 0)) tip(s, 'tipAbility', 'Tap a hero portrait below to unleash their ability.');
   if (g.ammo.starve > 0.35 && g.ammo.pile < 1) tip(s, 'tipAmmo', 'Out of ammo! Heroes wait while the revolver slices more. Pick Slicer Chambers to cut more bullets per cycle.', 5);
-  if (g.ebullets.items.length > 0) tip(s, 'tipCut', 'Swipe across enemy bullets to CUT them before they hit the wall!', 5);
+  if (g.ebullets.items.length > 0) tip(s, 'tipCut', 'Swipe a finger across enemy bullets to CUT them before they hit the wall. Each cut costs CUT energy (bar at the bottom), refills the ammo pile and charges abilities!', 5);
 }
 
 // ---------------------------------------------------------------------- input (bullet cutting)

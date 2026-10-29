@@ -539,3 +539,23 @@ test('difficulty rises smoothly: round pressure is monotonic and round enemy-hit
     assert.ok(late > early * 3, `${st.id}: late rounds (${Math.round(late)}) should dwarf early rounds (${Math.round(early)})`);
   }
 });
+
+test('research bonuses reach the simulation: reload, crit, armor, repairs, ammo pile, slicer, cut cost', () => {
+  const a = mk(['vanguard']);
+  const b = mk(['vanguard'], { research: { quick_draw: 4, keen_eye: 5, armor_plating: 5, field_repairs: 4, ammo_crates: 3, slicer_tuning: 4, keen_edge: 3, tactician: 4 } });
+  assert.ok(b.reloadTime(b.heroes[0]) < a.reloadTime(a.heroes[0]) * 0.85 + 1e-9, 'Quick Draw shortens reload by 16%');
+  assert.ok(Math.abs(b.mods.crit - 0.10) < 1e-9);
+  assert.ok(Math.abs(b.mods.reduce - 0.15) < 1e-9);
+  assert.equal(b.ammo.cap, a.ammo.cap + 6);
+  assert.ok(b.ammo.rev < a.ammo.rev);
+  assert.ok(b.mods.regen === 2);
+  assert.ok(Math.abs(b.mods.abilityPower - 0.32) < 1e-9);
+  // Keen Edge: slicing one bullet costs 3.5 CUT energy instead of 5
+  for (const [g, cost] of [[a, 5], [b, 3.5]]) {
+    g.state = 'combat';
+    g.spawnEnemyBullet(100, 100, 0, 0, 1, 4, 1, 'spit');
+    const before = g.cut.energy;
+    assert.equal(g.cutSegment(90, 100, 110, 100), 1);
+    assert.ok(Math.abs(before - g.cut.energy - cost) < 1e-9, `cut cost ${cost}`);
+  }
+});
