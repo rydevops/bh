@@ -11,18 +11,24 @@ import './ui/results.js';
 import { startCombat, measureSafeArea, inCombat } from './ui/combat.js';
 import { store } from './store.js';
 import { audio } from './audio/index.js';
+import { startTitleScene } from './render/titleScene.js';
 import { registerServiceWorker, checkForUpdate, watchForUpdates, currentBuild } from './update.js';
 
-registerScreen('splash', ({ status, ready, onStart }) => {
+registerScreen('splash', ({ status }) => {
   const bar = h('i', { style: { width: '8%' } });
   const st = h('div', { class: 'status', role: 'status' }, status || '');
   const btn = h('button', { class: 'btn primary big', style: { display: 'none', minWidth: '220px' } }, 'Tap to play');
+  const scene = h('canvas', { class: 'scene', 'aria-hidden': 'true' });
   const el = h('div', { class: 'splash', style: { flex: 1 } },
+    scene,
     h('div', { class: 'logo title' }, 'Bullet', h('b', null, 'Heroes')),
-    h('div', { class: 'muted' }, 'Squad up. Hold the wall.'),
-    h('div', { class: 'bar' }, bar), st, btn,
-    h('div', { class: 'muted', style: { fontSize: '.7rem', position: 'absolute', bottom: 'calc(var(--sab) + 14px)' } }, `No ads · No purchases · Build ${currentBuild()}`));
-  return { el, ui: { bar, st, btn } };
+    h('div', { class: 'tagline' }, 'Squad up. Hold the wall.'),
+    h('div', { class: 'actions' }, h('div', { class: 'bar' }, bar), st, btn),
+    h('div', { class: 'muted foot', style: { fontSize: '.7rem' } }, `No ads · No purchases · Build ${currentBuild()}`));
+  const p = store.profile;
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches || p.settings.reduceFlash;
+  const stopScene = startTitleScene(scene, p.squad.map((id) => ({ id, skin: p.heroes[id].skin })), { animate: !calm });
+  return { el, ui: { bar, st, btn }, destroy: stopScene };
 });
 
 async function boot() {
@@ -41,6 +47,7 @@ async function boot() {
     const p = store.profile;
     const brandNew = Object.keys(p.stages).length === 0 && !p.flags.tutorial && p.stats.runs === 0;
     audio.playMusic('menu');
+    if (splash.destroy) splash.destroy(); // stop the title animation
     if (brandNew) { p.flags.tutorial = true; store.save(true); startCombat({ stageId: '1-1' }); } // first fight within seconds
     else go('home');
   };
