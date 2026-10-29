@@ -33,6 +33,8 @@ export class Game {
     this.H = o.layout?.H ?? 680;
     this.wallY = o.layout?.wallY ?? this.H - 200;
     this.heroY = o.layout?.heroY ?? this.wallY + 54;
+    // Enemies above this line (still behind the HUD's wave / wall bars) can't be hit and don't shoot.
+    this.engageY = o.layout?.engageY ?? -1e9;
     this.rng = new RNG(o.seed ?? 1);
     this.emit = o.emit !== false;
     this.events = [];
@@ -235,8 +237,9 @@ export class Game {
       fireT: this.rng.range(0.8, def.fireEvery || 2), atWall: false,
       holdY: def.holdDist ? this.wallY - def.holdDist : null,
       world: this.stage ? this.stage.world : Math.floor(this.waveIdx / 10) % 3,
-      untargetable: false, hitFlash: 0,
+      untargetable: false, gated: false, hitFlash: 0,
     };
+    if (!def.boss) { e.gated = e.y < this.engageY; e.untargetable = e.gated; }
     this.enemies.push(e);
     return e;
   }
@@ -450,6 +453,8 @@ export class Game {
       if (e.dead) continue;
       e.t += dt;
       if (e.boss) { updateBoss(this, e, dt); continue; }
+      e.gated = e.y < this.engageY; // still behind the wave bar: safe, and holds its fire
+      e.untargetable = e.gated;
       const def = e.def;
       const sp = e.speed * e.slowF;
       let vx = 0, vy = 0;
@@ -462,7 +467,7 @@ export class Game {
         // ranged / support hold at a standoff distance
         if (e.y < stopY) vy = sp;
         if (def.fly) vx = Math.sin(e.t * 1.6 + e.zig) * 34;
-        if (def.behavior === 'ranged' && e.y > 6) {
+        if (def.behavior === 'ranged' && e.y > 6 && !e.gated) {
           e.fireT -= dt;
           if (e.fireT <= 0) { e.fireT = def.fireEvery; this.enemyShoot(e); }
         }
@@ -899,7 +904,7 @@ export class Game {
       }
       for (let i = 0; i < E.length; i++) {
         const e = E[i];
-        if (e.dead || e.y < -4) continue;
+        if (e.dead || e.y < -4 || e.gated) continue;
         if (b.hit.indexOf(e.id) !== -1) continue;
         const rr = e.r + b.r;
         if (pointSegDist2(e.x, e.y, px, py, b.x, b.y) > rr * rr) continue;
@@ -935,6 +940,7 @@ export class Game {
 
   /** Full damage pipeline: formula -> shield/health -> status riders -> events. Returns hp+shield removed. */
   hit(h, e, attack, o) {
+    if (e.gated) return 0;
     const skill = this.skillMult(h, e);
     const dmg = computeDamage({ attack, skill, crit: o.crit, critMult: o.critMult, resist: resistMult(e, o.armorPierce || 0) });
     if (this.mods.focus > 0 && !o.tick && !o.splash) { e.focusN = Math.min(6, e.focusN + 1); e.focusT = 2; }
@@ -1090,7 +1096,7 @@ export class Game {
   firestorm(h, power, dur) {
     let best = null, bc = -1;
     for (const e of this.enemies) {
-      if (e.dead || e.y < 0) continue;
+      if (e.dead || e.y < 0 || e.gated) continue;
       let c = 0;
       for (const o of this.enemies) if (!o.dead && dist(o.x, o.y, e.x, e.y) < 75) c++;
       c += e.y / 2000;

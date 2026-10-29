@@ -67,6 +67,7 @@ export function startCombat(opts) {
   // The status-bar strip matches the top row of this world's sky (see setEdgeColor).
   renderer.onWorld = (w) => setEdgeColor(skyTop(w));
   bindInput(s);
+  measureEngage(s);
   const world = stage ? stage.world : 0;
   playBattleMusic(s, false, world);
   s.last = performance.now();
@@ -80,6 +81,18 @@ function playBattleMusic(s, boss, world) {
   if (s.lastMusic === name) return;
   s.lastMusic = name;
   audio.playMusic(name);
+}
+
+/**
+ * Enemies don't count (can't be hit, don't shoot) until they are below the HUD's wave / wall bars.
+ * Measured from the real layout, so it is right on every phone and with or without a notch.
+ */
+function measureEngage(s) {
+  const app = document.getElementById('app');
+  const base = s.hud && s.hud.base;
+  if (!app || !base) return;
+  const bottom = base.getBoundingClientRect().bottom - app.getBoundingClientRect().top;
+  if (bottom > 0) s.game.engageY = (bottom + 6) / s.layout.k;
 }
 
 // ---------------------------------------------------------------------- loop
@@ -229,7 +242,9 @@ function relayout(s) {
   s.cssW = cssW; s.cssH = cssH;
   const L = layoutFor(cssW, cssH, safeBottom);
   const g = s.game;
+  s.layout = L;
   g.H = L.H; g.wallY = L.wallY; g.heroY = L.heroY;
+  measureEngage(s);
   for (const hh of g.allHeroes) hh.y = L.heroY;
   for (const t of g.turrets) t.y = L.wallY - 6;
   s.renderer.resize(cssW, cssH, s.dpr);

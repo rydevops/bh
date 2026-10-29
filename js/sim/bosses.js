@@ -13,6 +13,7 @@ export function spawnBoss(g, id) {
     armor: def.armor, shield: 0, behavior: 'boss', tags: ['boss'],
   };
   const e = g.spawnEnemy(pseudo, W / 2, { y: -def.r * 1.3 });
+  e.gated = false; // bosses manage their own targetability (see updateBoss)
   e.hp = e.max = def.hp * (1 + (sc.hp - 1) * TUNE.bossHp);
   e.armor = def.armor;
   e.world = def.world;
