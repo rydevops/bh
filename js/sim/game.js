@@ -314,6 +314,8 @@ export class Game {
     this.state = 'upgrade';
     // Extra heroes are a random reward: SUMMON_CHANCE per checkpoint, but never two checkpoints in a row without one.
     this.summonOffer = this.reserve.length > 0 && (this.summonMissed >= 1 || this.rng.chance(SUMMON_CHANCE));
+    // Which waiting hero turns up is random too (the lead is the only one the player chooses).
+    this.summonPick = this.summonOffer ? this.reserve[this.rng.int(0, this.reserve.length - 1)].id : null;
     this.summonMissed = this.summonOffer ? 0 : this.summonMissed + 1;
     this.choices = this.rollChoices();
     this.ev('upgradeOpen', {});
@@ -327,7 +329,7 @@ export class Game {
       wave: Math.max(0, this.waveIdx), baseFrac: this.base.hp / this.base.max, n: summon ? 2 : 3, exclude,
       ammoPressure: this.ammo.starve, heroes: new Set(this.heroes.map((h) => h.id)),
     });
-    return summon ? ['summon:' + this.reserve[0].id, ...picks] : picks;
+    return summon ? ['summon:' + (this.reserve.some((h) => h.id === this.summonPick) ? this.summonPick : this.reserve[0].id), ...picks] : picks;
   }
   reroll() {
     if (this.state !== 'upgrade' || this.rerolls <= 0) return false;

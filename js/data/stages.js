@@ -95,12 +95,17 @@ function withStarterFrags(def, idx) {
   return frag;
 }
 
+/** Research tokens for a first clear, by stage index: they rise with the stage and bosses pay the most. */
+export const STAGE_TOKENS = [1, 1, 2, 3, 2, 2, 3, 4, 3, 3, 4, 6];
+/** Replays still pay research tokens: half, rounded up, never less than 1. */
+export const replayTokens = (n) => Math.max(1, Math.ceil(n / 2));
+
 export const STAGES = STAGE_DEFS.map((s, idx) => {
   const enemyIds = new Set(s.pool.map((p) => p.e));
   const tags = new Set();
   for (const id of enemyIds) for (const t of ENEMIES[id].tags) tags.add(t);
   if (s.boss) tags.add('boss');
-  return { ...s, frag: withStarterFrags(s, idx), idx, tags: [...tags], enemies: [...enemyIds] };
+  return { ...s, tokens: STAGE_TOKENS[idx], frag: withStarterFrags(s, idx), idx, tags: [...tags], enemies: [...enemyIds] };
 });
 
 export const STAGE_BY_ID = Object.fromEntries(STAGES.map((s) => [s.id, s]));

@@ -4,9 +4,9 @@ import { h } from './dom.js';
 import { icon, stars } from './icons.js';
 import { registerScreen, go, navBar, gearButton, openSheet, toast, refresh } from './app.js';
 import { startCombat } from './combat.js';
-import { openSquad, powerClass } from './squad.js';
+import { openSquad, powerClass, leadPicker } from './squad.js';
 import { store } from '../store.js';
-import { STAGES, WORLDS, stagesOfWorld, recPower, MILESTONES } from '../data/stages.js';
+import { STAGES, WORLDS, stagesOfWorld, recPower, MILESTONES, replayTokens } from '../data/stages.js';
 import { ENEMIES, BOSSES, MODIFIERS } from '../data/enemies.js';
 import { HEROES } from '../data/heroes.js';
 import { enemyPortrait, bossPortrait } from '../render/sprites.js';
@@ -53,7 +53,7 @@ registerScreen('stages', ({ world } = {}) => {
       h('div', { class: 'grow' },
         h('div', { class: 'title', style: { fontSize: '1.05rem' }, html: icon(survivalUnlocked(p) ? 'wave' : 'lock') + ' Survival' }),
         h('div', { class: 'muted', style: { fontSize: '.78rem' } }, survivalUnlocked(p) ? `Endless escalating waves. Best: wave ${p.survivalBest + 1 > 1 ? p.survivalBest + 1 : '-'}` : `Clear stage ${MILESTONES.survival.stage} to unlock.`)),
-      h('button', { class: 'btn small primary', disabled: !survivalUnlocked(p), onclick: () => startCombat({ survival: true }) }, 'Start')));
+      h('button', { class: 'btn small primary', disabled: !survivalUnlocked(p), onclick: openSurvival }, 'Start')));
 
   const el = h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } },
     h('div', { class: 'head' }, h('button', { class: 'back', 'aria-label': 'Back', onclick: () => go('home'), html: icon('back') }), h('h2', { class: 'title grow' }, 'Campaign'), gearButton()),
@@ -62,6 +62,17 @@ registerScreen('stages', ({ world } = {}) => {
     navBar('home'));
   return { el };
 });
+
+function openSurvival() {
+  let sheet;
+  const render = () => sheet.el.replaceChildren(h('div', null,
+    h('h2', { class: 'title', style: { fontSize: '1.5rem' } }, 'Survival'),
+    h('p', { class: 'muted', style: { margin: '6px 0', fontSize: '.85rem' } }, 'Endless escalating waves. Pick who starts the battle; your other heroes join at random through the reward cards.'),
+    leadPicker(() => render()),
+    h('button', { class: 'btn primary big block', style: { marginTop: '10px' }, onclick: () => { sheet.close(); startCombat({ survival: true }); } }, 'Start')));
+  sheet = openSheet(h('div'));
+  render();
+}
 
 function openStage(s) {
   const p = store.profile;
@@ -86,11 +97,12 @@ function openStage(s) {
       h('div', { class: 'chips-row' },
         h('span', { class: 'reward coin', html: `${icon('coin')} ${s.coins * (first ? 2 : 1)}+` }),
         first ? h('span', { class: 'reward gem', html: `${icon('gem')} ${s.gems}` }) : null,
-        s.tokens ? h('span', { class: 'reward token', html: `${icon('token')} ${first ? s.tokens : 1}` }) : null,
+        h('span', { class: 'reward token', html: `${icon('token')} ${first ? s.tokens : replayTokens(s.tokens)}` }),
         frags),
       hardUnlocked(p) ? h('div', { class: 'row', style: { margin: '8px 0' } },
         h('span', { class: 'grow' }, h('b', null, 'Hard mode'), h('div', { class: 'muted', style: { fontSize: '.72rem' } }, 'Tougher enemies, +80% rewards')),
         h('button', { class: 'switch', role: 'switch', 'aria-label': 'Hard mode', 'aria-checked': String(!!p.flags.hardMode), onclick: () => { store.update((pr) => { pr.flags.hardMode = !pr.flags.hardMode; }); render(); } })) : null,
+      leadPicker(() => render()),
       h('div', { class: 'row', style: { justifyContent: 'space-between', margin: '10px 0' } },
         h('span', { class: 'muted' }, 'Squad power'),
         h('b', { class: 'power ' + powerClass(power, need), html: `${icon('bolt')} ${fmtFull(power)} / ${fmtFull(need)}` })),

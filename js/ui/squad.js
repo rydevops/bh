@@ -13,6 +13,21 @@ import { fmtFull } from '../util.js';
 
 export function powerClass(have, need) { return have >= need ? 'ok' : have >= need * 0.8 ? 'warn' : 'low'; }
 
+/**
+ * "Start with" row: pick which squad hero opens the battle alone. The rest of the squad is summoned at random
+ * by reward cards after each wave. Choosing moves that hero to the front of the saved squad.
+ */
+export function leadPicker(onChange) {
+  const p = store.profile;
+  return h('div', { class: 'lead-pick' },
+    h('div', { class: 'muted', style: { fontSize: '.72rem', fontWeight: 900, letterSpacing: '.08em', marginBottom: '4px' } }, 'START WITH'),
+    h('div', { class: 'lead-row' }, p.squad.map((id, i) => h('button', {
+      class: 'lead-btn' + (i === 0 ? ' on' : ''), 'aria-pressed': String(i === 0), 'aria-label': `${HEROES[id].name}${i === 0 ? ' (starting hero)' : ': start with this hero'}`,
+      onclick: () => { if (i === 0) return; sfx('ui_click'); store.update((pr) => setSquad(pr, [id, ...pr.squad.filter((x) => x !== id)])); onChange(); },
+    }, h('img', { src: heroPortrait(id, p.heroes[id].skin, 64), alt: '' }), h('span', null, HEROES[id].name)))),
+    p.squad.length > 1 ? h('div', { class: 'muted', style: { fontSize: '.72rem', marginTop: '4px' } }, 'The other heroes join at random through reward cards after each wave.') : null);
+}
+
 export function openSquad({ stage = null, onDone } = {}) {
   let sheet;
   const render = () => {
@@ -32,7 +47,7 @@ export function openSquad({ stage = null, onDone } = {}) {
       slotEls.push(h('div', { class: 'slot filled' + (i === 0 ? ' lead' : '') },
         h('button', { class: 'slot-main', 'aria-label': i === 0 ? `${HEROES[id].name}, starts the battle` : `Make ${HEROES[id].name} the lead hero`, onclick: makeLead },
           h('img', { src: heroPortrait(id, hero.skin, 80), alt: '' }), h('span', { class: 'nm' }, `${HEROES[id].name} · Lv${hero.lv}`)),
-        h('span', { class: 'lead-tag' + (i === 0 ? '' : ' alt') }, i === 0 ? 'START' : `JOIN ${i}`),
+        h('span', { class: 'lead-tag' + (i === 0 ? '' : ' alt') }, i === 0 ? 'START' : 'RANDOM'),
         h('button', { class: 'slot-x', 'aria-label': `Remove ${HEROES[id].name}`, onclick: remove }, '×')));
     }
     const picks = HERO_ORDER.map((id) => {
@@ -56,7 +71,7 @@ export function openSquad({ stage = null, onDone } = {}) {
       h('div', { class: 'row', style: { justifyContent: 'space-between', marginBottom: '8px' } },
         h('h3', { class: 'title' }, 'Your squad'),
         h('span', { class: 'power ' + (rec ? powerClass(power, rec) : 'ok'), html: `${icon('bolt')} ${fmtFull(power)}${rec ? ` <small class="muted">/ ${fmtFull(rec)} rec.</small>` : ''}` })),
-      h('p', { class: 'muted', style: { fontSize: '.78rem', margin: '0 0 8px' } }, 'The first hero starts every battle alone. The others are summoned by reward cards after each wave. Tap a hero to make them the lead.'),
+      h('p', { class: 'muted', style: { fontSize: '.78rem', margin: '0 0 8px' } }, 'Your lead hero starts every battle alone (you can also change them on the stage screen). The others are summoned at random by reward cards after each wave.'),
       h('div', { class: 'slots' }, slotEls),
       h('div', { class: 'panel', style: { marginTop: '10px' } },
         h('div', { class: 'muted', style: { fontSize: '.72rem', fontWeight: 900, letterSpacing: '.08em', marginBottom: '4px' } }, 'SQUAD STRENGTHS & GAPS'),

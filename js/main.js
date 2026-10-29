@@ -48,7 +48,7 @@ async function boot() {
     const brandNew = Object.keys(p.stages).length === 0 && !p.flags.tutorial && p.stats.runs === 0;
     audio.playMusic('menu');
     if (splash.destroy) splash.destroy(); // stop the title animation
-    if (brandNew) { p.flags.tutorial = true; store.save(true); startCombat({ stageId: '1-1' }); } // first fight within seconds
+    if (brandNew) startCombat({ tutorial: true }); // first run (or after a reset): a guided practice round
     else go('home');
   };
   progress(20);
