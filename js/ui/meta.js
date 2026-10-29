@@ -12,6 +12,9 @@ import { buyResearch, researchCost, claimMission, missionDef, claimLogin, loginS
 
 const rewardHtml = (r) => [r.coins ? `<span class="coin">${icon('coin')} ${r.coins}</span>` : '', r.gems ? `<span class="gem">${icon('gem')} ${r.gems}</span>` : '', r.tokens ? `<span class="token">${icon('token')} ${r.tokens}</span>` : ''].filter(Boolean).join(' ');
 
+/** One entry per currency so the login calendar can stack them vertically in a narrow cell. */
+const rewardParts = (r) => [r.coins ? { cls: 'coin', html: `${icon('coin')} ${r.coins}` } : null, r.gems ? { cls: 'gem', html: `${icon('gem')} ${r.gems}` } : null, r.tokens ? { cls: 'token', html: `${icon('token')} ${r.tokens}` } : null].filter(Boolean);
+
 // ------------------------------------------------------------------ research
 registerScreen('research', () => {
   const p = store.profile;
@@ -50,7 +53,7 @@ registerScreen('missions', () => {
     const doneN = ls.claimedToday ? ((ls.streak - 1) % LOGIN_CALENDAR.length) + 1 : ls.streak % LOGIN_CALENDAR.length;
     const done = i < doneN;
     const today = !ls.claimedToday && i === ls.streak % LOGIN_CALENDAR.length;
-    return h('div', { class: 'day' + (done ? ' done' : '') + (today ? ' today' : '') }, h('span', { class: 'muted' }, `Day ${i + 1}`), h('div', { style: { fontSize: '.7rem', lineHeight: 1.5 }, html: rewardHtml(r).replace(/ /g, '<br>') }), done ? h('span', { html: icon('check') }) : h('span'));
+    return h('div', { class: 'day' + (done ? ' done' : '') + (today ? ' today' : '') }, h('span', { class: 'muted' }, `Day ${i + 1}`), h('div', { class: 'day-rew' }, rewardParts(r).map((x) => h('div', { class: x.cls, html: x.html }))), done ? h('span', { html: icon('check') }) : h('span'));
   }));
 
   const list = (kind, items) => items.map((m, i) => {
