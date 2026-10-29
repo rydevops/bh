@@ -587,10 +587,15 @@ export class Renderer {
   drawBullets(ctx, g) {
     ctx.lineCap = 'round';
     const hc = this.settings.highContrast;
+    // Bullet upgrades change how the bullets look, so a build is visible on screen:
+    // Heavy Rounds = fatter, Hypervelocity = longer streaks, Cryo = icy, Explosive = fiery head, Armor-Piercing = gold needle core.
+    const ow = g.owned;
+    const heavy = ow.heavy_rounds || 0, fast = ow.hypervelocity || 0, cryo = ow.cryo_rounds || 0, boom = ow.explosive_rounds || 0, pierce = ow.armor_piercing || 0;
+    const wide = 3 + heavy * 0.6, streak = 1 + fast * 0.3;
     for (const b of g.bullets.items) {
       if (b.dead) continue;
       const c = b.src ? this.heroCols[b.src.idx] : { glow: '#ffd23f' };
-      const col = this.trailColor(c, b.x * 0.01);
+      const col = cryo && b.kind !== 'rocket' ? '#a8e0ff' : this.trailColor(c, b.x * 0.01);
       if (b.kind === 'rocket') {
         const a = Math.atan2(b.vy, b.vx);
         ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(a);
@@ -601,20 +606,21 @@ export class Renderer {
         ctx.restore();
       } else if (b.kind === 'sniper') {
         ctx.globalCompositeOperation = 'lighter';
-        ctx.strokeStyle = col; ctx.globalAlpha = 0.5; ctx.lineWidth = 5;
-        ctx.beginPath(); ctx.moveTo(b.x - b.vx * 0.05, b.y - b.vy * 0.05); ctx.lineTo(b.x, b.y); ctx.stroke();
-        ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(b.x - b.vx * 0.04, b.y - b.vy * 0.04); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.strokeStyle = col; ctx.globalAlpha = 0.5; ctx.lineWidth = 5 + heavy * 0.8;
+        ctx.beginPath(); ctx.moveTo(b.x - b.vx * 0.05 * streak, b.y - b.vy * 0.05 * streak); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.strokeStyle = pierce ? '#ffe27a' : '#fff'; ctx.lineWidth = 2 + heavy * 0.3;
+        ctx.beginPath(); ctx.moveTo(b.x - b.vx * 0.04 * streak, b.y - b.vy * 0.04 * streak); ctx.lineTo(b.x, b.y); ctx.stroke();
         ctx.globalCompositeOperation = 'source-over';
       } else if (b.kind === 'drone') {
         ctx.fillStyle = col; ctx.beginPath(); ctx.arc(b.x, b.y, 3.4, 0, 7); ctx.fill();
         ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(b.x, b.y, 1.5, 0, 7); ctx.fill();
       } else {
         ctx.globalCompositeOperation = 'lighter';
-        ctx.strokeStyle = col; ctx.globalAlpha = 0.9; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(b.x - b.vx * 0.032, b.y - b.vy * 0.032); ctx.lineTo(b.x, b.y); ctx.stroke();
-        ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.moveTo(b.x - b.vx * 0.016, b.y - b.vy * 0.016); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.strokeStyle = col; ctx.globalAlpha = 0.9; ctx.lineWidth = wide;
+        ctx.beginPath(); ctx.moveTo(b.x - b.vx * 0.032 * streak, b.y - b.vy * 0.032 * streak); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.strokeStyle = pierce ? '#ffe27a' : '#fff'; ctx.lineWidth = 1.2 + heavy * 0.25;
+        ctx.beginPath(); ctx.moveTo(b.x - b.vx * 0.016 * (1 + pierce * 0.8) * streak, b.y - b.vy * 0.016 * (1 + pierce * 0.8) * streak); ctx.lineTo(b.x, b.y); ctx.stroke();
+        if (boom) { ctx.globalAlpha = 0.55; ctx.fillStyle = '#ff8a3a'; ctx.beginPath(); ctx.arc(b.x, b.y, 3.5 + boom * 1.6, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
         ctx.globalCompositeOperation = 'source-over';
       }
     }

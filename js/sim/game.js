@@ -303,10 +303,7 @@ export class Game {
     }
     this.ev('waveClear', { wave: this.waveIdx });
     if (this.survival) this.base.hp = Math.min(this.base.max, this.base.hp + this.base.max * 0.08);
-    // Survival offers upgrades every 2nd wave to keep runs flowing.
-    if (this.survival && (this.waveIdx % 2 === 1 || this.reserve.length)) { this.openUpgrade(); return; }
-    if (this.survival) { this.checkpoint(this.waveIdx + 1); this.startWave(this.waveIdx + 1); return; }
-    this.openUpgrade();
+    this.openUpgrade(); // every wave ends with a reward pick, in Survival too
   }
 
   // ------------------------------------------------------------------ upgrades

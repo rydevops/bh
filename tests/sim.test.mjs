@@ -682,3 +682,29 @@ test('which hero a summon card brings is random, and the lead hero is whoever th
   }
   assert.deepEqual([...joined].sort(), ['patch', 'vanguard'], 'either waiting hero can be offered');
 });
+
+test('Survival ends every wave with a reward pick, not every second wave', () => {
+  const g = new Game({ stage: null, squad: squad('vanguard', 'rook', 'patch'), seed: 3, layout: LAYOUT, emit: false });
+  let rewards = 0;
+  for (let w = 0; w < 6; w++) {
+    g.spawnQ.length = 0; g.enemies.length = 0; step(g, 0.3);
+    assert.equal(g.state, 'upgrade', `wave ${w + 1} ends with a reward pick`);
+    rewards++;
+    g.pickUpgrade(g.choices[g.choices.length - 1]);
+    assert.equal(g.state, 'combat');
+  }
+  assert.equal(rewards, 6);
+});
+
+test('every reward round offers at least one bullet upgrade', () => {
+  const rng = new RNG(21);
+  for (let i = 0; i < 300; i++) {
+    const picks = rollUpgrades(rng, { owned: {}, squadTags: new Set(['rapid']), enemyTags: new Set(['swarm']), wave: i % 12, baseFrac: 1, n: i % 2 ? 3 : 2, heroes: new Set(['vanguard', 'rook']) });
+    assert.ok(picks.some((id) => UPGRADES[id].bullet), 'picks: ' + picks.join(','));
+  }
+  // once every bullet upgrade is maxed, the rule steps aside instead of failing
+  const owned = {};
+  for (const id in UPGRADES) if (UPGRADES[id].bullet) owned[id] = UPGRADES[id].max;
+  const picks = rollUpgrades(new RNG(1), { owned, squadTags: new Set(), enemyTags: new Set(), wave: 5, baseFrac: 1, heroes: new Set(['vanguard']) });
+  assert.equal(picks.length, 3);
+});
