@@ -88,9 +88,19 @@ js/render/     canvas renderer, procedural sprites + backgrounds, particles
 js/audio/      WebAudio SFX synth + generative music sequencer
 js/ui/         screens (home, heroes, stages, squad, results, meta, settings) + combat controller/HUD
 js/            save.js (versioned, checksummed, backup), economy.js, progression.js, update.js, store.js
+art/, art_desc/  sprite sheets (shipped) and the artist briefs (not shipped)
 tools/         stamp/build/serve, balance bot, icon generator, dev pages
 tests/         node:test suites
 ```
+
+## Replacing the procedural art with an artist's sprite sheets
+
+Heroes are drawn in code by default (`js/render/sprites.js`). A hero can be switched to real art one at a time:
+
+- `art/<hero>.png` is one transparent sprite sheet and `art/<hero>.json` is its atlas. Frames: `idle`, `fire`, `ability` (the 72 x 112 world box at 4x) and `icon` (a square bust for portraits and the app icon). The exact layout is in `art_desc/SHEET_SPEC.md`.
+- `art_desc/<hero>.md` is a short description (500 words max) for the artist.
+- The sheet is registered in `js/render/art.js` (`SHEETS`, keyed `hero:skin`). Anything not registered, and any sheet that fails to load, keeps the procedural sprite, so the game always renders.
+- **Vanguard is the first hero converted** (default skin; his other skins still use the procedural art until they get sheets). `node tools/art/export-sheet.mjs vanguard` regenerates the placeholder sheet from the procedural drawing; an artist's finished PNG just replaces it. `node tools/gen-icons.mjs` rebuilds the app icons from the art.
 
 ## Design-document coverage
 

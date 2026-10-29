@@ -493,7 +493,8 @@ export class Renderer {
   drawHeroes(ctx, g) {
     const k = this.k;
     for (const h of g.heroes) {
-      const s = heroSprite(h.id, h.skin, k);
+      // sprite-sheet heroes have a firing frame and an ability frame; procedural ones ignore the name
+      const s = heroSprite(h.id, h.skin, k, h.ab.active > 0 ? 'ability' : h.recoil > 0.45 ? 'fire' : 'idle');
       const bob = Math.sin(this.t * 2.2 + h.idx) * 1.2;
       const rc = Math.max(0, h.recoil) * 3;
       const dis = h.disabled > 0;

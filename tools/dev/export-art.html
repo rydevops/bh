@@ -1,0 +1,70 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#888">
+<script type="module">
+// Draws the sprite sheet for one hero from the procedural sprite (used to produce the first version of art/<hero>.png).
+// The frame layout is the contract with the artist: see art/README.md and the atlas art/<hero>.json.
+import { proceduralHero } from '../../js/render/sprites.js';
+import { skinColors } from '../../js/data/heroes.js';
+
+const S = 4, W = 72, H = 112;               // sheet scale and the logical world box of every hero
+const FW = W * S, FH = H * S, ICON = 256;   // frame size in sheet pixels, icon size
+const id = new URLSearchParams(location.search).get('hero') || 'vanguard';
+const c = skinColors(id, 'default');
+const idle = proceduralHero(id, 'default', S);
+
+const mk = (w, h) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; return cv; };
+const frame = (draw) => { const cv = mk(FW, FH); const x = cv.getContext('2d'); draw(x); return cv; };
+
+const frames = {};
+// idle: the sprite as it stands
+frames.idle = idle;
+// fire: kicks back a little, muzzle flash at the rifle tip
+frames.fire = frame((x) => {
+  x.drawImage(idle, 0, 2.5 * S);
+  const fx = (36 + 13) * S, fy = (56 - 33 + 2.5) * S - 6 * S;
+  x.globalCompositeOperation = 'lighter';
+  const g = x.createRadialGradient(fx, fy, 0, fx, fy, 15 * S);
+  g.addColorStop(0, 'rgba(255,240,170,.95)'); g.addColorStop(0.45, 'rgba(255,170,60,.55)'); g.addColorStop(1, 'rgba(255,120,30,0)');
+  x.fillStyle = g; x.beginPath(); x.arc(fx, fy, 15 * S, 0, 7); x.fill();
+  x.fillStyle = '#fff6c8';
+  x.beginPath(); for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4, r = (i % 2 ? 4 : 10) * S; x.lineTo(fx + Math.cos(a) * r, fy + Math.sin(a) * r); } x.closePath(); x.fill();
+});
+// ability: golden overdrive aura, rising sparks
+frames.ability = frame((x) => {
+  const cx = 36 * S, cy = 62 * S;
+  x.globalCompositeOperation = 'lighter';
+  const g = x.createRadialGradient(cx, cy, 4 * S, cx, cy, 36 * S);
+  g.addColorStop(0, c.glow + 'cc'); g.addColorStop(0.6, c.glow + '55'); g.addColorStop(1, c.glow + '00');
+  x.fillStyle = g; x.beginPath(); x.ellipse(cx, cy, 34 * S, 50 * S, 0, 0, 7); x.fill();
+  x.globalCompositeOperation = 'source-over';
+  x.drawImage(idle, 0, 0);
+  x.globalCompositeOperation = 'lighter';
+  x.strokeStyle = '#fff4c0'; x.lineCap = 'round'; x.lineWidth = 1.6 * S;
+  [[-24, 74, 14], [-17, 90, 18], [24, 80, 16], [18, 96, 12], [-28, 54, 10], [29, 58, 10]].forEach(([dx, y, len]) => {
+    x.globalAlpha = 0.85; x.beginPath(); x.moveTo(cx + dx * S, y * S); x.lineTo(cx + dx * S, (y - len) * S); x.stroke();
+  });
+  x.globalAlpha = 1;
+});
+// icon: head-and-shoulders bust, square
+const icon = (() => {
+  const cv = mk(ICON, ICON), x = cv.getContext('2d');
+  const crop = 60, ox = 6, oy = 19, k = ICON / crop;
+  const big = proceduralHero(id, 'default', k);
+  x.drawImage(big, -ox * k, -oy * k);
+  return cv;
+})();
+
+const layout = { idle: [0, 0, FW, FH], fire: [FW, 0, FW, FH], ability: [FW * 2, 0, FW, FH], icon: [0, FH, ICON, ICON] };
+const sheet = mk(FW * 3, FH + ICON);
+const sx = sheet.getContext('2d');
+for (const [name, cv] of Object.entries({ idle: frames.idle, fire: frames.fire, ability: frames.ability, icon })) {
+  const [x, y] = layout[name]; sx.drawImage(cv, x, y);
+}
+window.result = {
+  png: sheet.toDataURL('image/png'),
+  atlas: {
+    image: `${id}.png`, scale: S, logical: { w: W, h: H },
+    frames: Object.fromEntries(Object.entries(layout).map(([n, [x, y, w, h]]) => [n, { x, y, w, h }])),
+  },
+};
+window.done = true;
+</script>
