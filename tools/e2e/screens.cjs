@@ -51,7 +51,7 @@ const OUT = process.env.SHOTS ? process.env.SHOTS + '/s_' : null;
   await p.click('[aria-label="Settings"]'); await shot('settings');
   await p.click('.sheet [aria-label="Close"]');
   // survival run, pause menu, then ability use and cutting
-  await p.click('text=Survive'); await p.waitForSelector('.ab');
+  await p.click('text=Survive'); await p.click('.sheet button.primary:has-text("Start")'); await p.waitForSelector('.ab');
   await p.waitForTimeout(2500);
   await p.keyboard.press('1'); await p.keyboard.press('2');
   await p.waitForTimeout(5000);

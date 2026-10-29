@@ -4,6 +4,7 @@ import { h } from './dom.js';
 import { icon } from './icons.js';
 import { registerScreen, go, navBar, topBar, toast, confirmBox, refresh } from './app.js';
 import { startCombat } from './combat.js';
+import { startWithLeadPick } from './lead.js';
 import { openSquad, powerClass } from './squad.js';
 import { store } from '../store.js';
 import { STAGES, STAGE_BY_ID, WORLDS, recPower } from '../data/stages.js';
@@ -46,7 +47,7 @@ registerScreen('home', () => {
   const battle = () => {
     audio.unlock();
     if (cp) { startCombat({ resume: cp }); return; }
-    startCombat({ stageId: stage.id, hard });
+    startWithLeadPick({ stageId: stage.id, hard });
   };
 
   const ls = loginState(p);
@@ -80,7 +81,7 @@ registerScreen('home', () => {
         h('div', { class: 'row' },
           h('button', { class: 'btn grow', onclick: () => openSquad({ onDone: () => refresh() }), html: icon('heroes') + ' Squad' }),
           h('button', { class: 'btn grow', onclick: () => go('stages'), html: icon('list') + ' Stages' }),
-          h('button', { class: 'btn grow', onclick: () => { if (!survivalUnlocked(p)) { toast('Survival unlocks after clearing 2-4', true); return; } startCombat({ survival: true }); }, html: icon(survivalUnlocked(p) ? 'wave' : 'lock') + ' Survive' })))),
+          h('button', { class: 'btn grow', onclick: () => { if (!survivalUnlocked(p)) { toast('Survival unlocks after clearing 2-4', true); return; } startWithLeadPick({ survival: true }); }, html: icon(survivalUnlocked(p) ? 'wave' : 'lock') + ' Survive' })))),
     navBar('home'));
   return { el, destroy: stopShowcase };
 });

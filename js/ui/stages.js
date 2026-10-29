@@ -4,6 +4,7 @@ import { h } from './dom.js';
 import { icon, stars } from './icons.js';
 import { registerScreen, go, navBar, gearButton, openSheet, toast, refresh } from './app.js';
 import { startCombat } from './combat.js';
+import { startWithLeadPick } from './lead.js';
 import { openSquad, powerClass, leadPicker } from './squad.js';
 import { store } from '../store.js';
 import { STAGES, WORLDS, stagesOfWorld, recPower, MILESTONES, replayTokens } from '../data/stages.js';
@@ -63,16 +64,7 @@ registerScreen('stages', ({ world } = {}) => {
   return { el };
 });
 
-function openSurvival() {
-  let sheet;
-  const render = () => sheet.el.replaceChildren(h('div', null,
-    h('h2', { class: 'title', style: { fontSize: '1.5rem' } }, 'Survival'),
-    h('p', { class: 'muted', style: { margin: '6px 0', fontSize: '.85rem' } }, 'Endless escalating waves. Pick who starts the battle; your other heroes join at random through the reward cards.'),
-    leadPicker(() => render()),
-    h('button', { class: 'btn primary big block', style: { marginTop: '10px' }, onclick: () => { sheet.close(); startCombat({ survival: true }); } }, 'Start')));
-  sheet = openSheet(h('div'));
-  render();
-}
+const openSurvival = () => startWithLeadPick({ survival: true });
 
 function openStage(s) {
   const p = store.profile;
